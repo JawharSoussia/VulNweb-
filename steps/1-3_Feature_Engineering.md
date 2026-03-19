@@ -14,51 +14,74 @@ Extract, engineer, and prepare features from raw data. Handle scaling, normaliza
 
 ## 🎯 What to Do
 
-### Step 1: Create Feature Engineering Pipeline
+### Step 1: Create Feature Engineering Pipeline for UNSW-NB15
 
 **Create: `ml_model/training/feature_engineering.py`**
 
 ```python
-"""Feature Engineering Pipeline"""
+"""Feature Engineering Pipeline for UNSW-NB15 Dataset"""
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler, RobustScaler, LabelEncoder
 from sklearn.impute import SimpleImputer
-from feature_engine.outliers import IQROutlier
-from feature_engine.encoding import OrdinalEncoder
+from sklearn.feature_selection import VarianceThreshold
 import logging
 import pickle
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class FeatureEngineer:
-    """Feature engineering and preprocessing"""
+# UNSW-NB15 Features (remove non-numeric for engineering)
+UNSW_CATEGORICAL = ['srcip', 'dstip', 'proto', 'state', 'service', 'attack']
+UNSW_TARGET = 'label'
 
-    def __init__(self, train_df, val_df, test_df):
+class FeatureEngineer:
+    """Feature engineering and preprocessing for UNSW-NB15"""
+
+    def __init__(self, train_df, val_df, test_df, target_col=UNSW_TARGET):
         """Initialize with train/val/test dataframes"""
         self.train = train_df.copy()
         self.val = val_df.copy()
         self.test = test_df.copy()
+        self.target_col = target_col
         self.preprocessor = {}
 
-    def identify_columns(self, target_col='label'):
-        """Identify numeric and categorical columns"""
-        self.target_col = target_col
-        self.numeric_cols = self.train.select_dtypes(
-            include=['int64', 'float64']).columns.tolist()
-        self.numeric_cols.remove(target_col) if target_col in self.numeric_cols else None
+    def identify_columns(self):
+        """Identify numeric and categorical columns for UNSW-NB15"""
+        logger.info("=" * 60)
+        logger.info("IDENTIFYING FEATURES")
+        logger.info("=" * 60)
 
-        self.categorical_cols = self.train.select_dtypes(
-            include=['object']).columns.tolist()
+        # Numeric features are all except categorical and target
+        all_cols = set(self.train.columns)
+        categorical = set(UNSW_CATEGORICAL) & all_cols
+        target = {self.target_col} if self.target_col in all_cols else set()
 
-        logger.info(f"Numeric columns: {len(self.numeric_cols)}")
-        logger.info(f"Numeric: {self.numeric_cols[:5]}...")
-        logger.info(f"Categorical columns: {len(self.categorical_cols)}")
+        self.numeric_cols = list(all_cols - categorical - target)
+        self.categorical_cols = list(categorical)
+
+        logger.info(f"✓ Numeric columns ({len(self.numeric_cols)}): {self.numeric_cols[:5]}...")
+        logger.info(f"✓ Categorical columns ({len(self.categorical_cols)}): {self.categorical_cols}")
+
+    def drop_non_numeric_columns(self):
+        """Remove non-numeric columns from dataframes"""
+        logger.info("\n" + "=" * 60)
+        logger.info("REMOVING NON-NUMERIC COLUMNS")
+        logger.info("=" * 60)
+
+        cols_to_keep = self.numeric_cols + [self.target_col]
+
+        self.train = self.train[cols_to_keep]
+        self.val = self.val[cols_to_keep]
+        self.test = self.test[cols_to_keep]
+
+        logger.info(f"✓ Reduced train shape to: {self.train.shape}")
+        logger.info(f"✓ Reduced val shape to: {self.val.shape}")
+        logger.info(f"✓ Reduced test shape to: {self.test.shape}")
 
     def handle_missing_values(self):
-        """Handle missing values"""
+        """Handle missing values in numeric features"""
         logger.info("\n" + "=" * 60)
         logger.info("HANDLING MISSING VALUES")
         logger.info("=" * 60)
@@ -68,8 +91,10 @@ class FeatureEngineer:
             logger.info("✓ No missing values in training set")
             return
 
-        # Numeric: mean imputation
-        numeric_imputer = SimpleImputer(strategy='mean')
+        logger.warning(f"Found {missing.sum()} missing values")
+
+        # Use median for robustness (resistant to outliers)
+        numeric_imputer = SimpleImputer(strategy='median')
         self.train[self.numeric_cols] = numeric_imputer.fit_transform(
             self.train[self.numeric_cols])
         self.val[self.numeric_cols] = numeric_imputer.transform(
@@ -78,96 +103,78 @@ class FeatureEngineer:
             self.test[self.numeric_cols])
 
         self.preprocessor['numeric_imputer'] = numeric_imputer
-
-        # Categorical: mode imputation
-        for col in self.categorical_cols:
-            mode_val = self.train[col].mode()[0]
-            self.train[col].fillna(mode_val, inplace=True)
-            self.val[col].fillna(mode_val, inplace=True)
-            self.test[col].fillna(mode_val, inplace=True)
-
-        logger.info("✓ Missing values handled")
+        logger.info("✓ Missing values imputed with median")
 
     def handle_outliers(self):
-        """Handle outliers using IQR method"""
+        """Cap outliers at IQR bounds (don't remove to preserve attack patterns)"""
         logger.info("\n" + "=" * 60)
         logger.info("HANDLING OUTLIERS (IQR Method)")
         logger.info("=" * 60)
 
-        outlier_detector = IQROutlier(variables=self.numeric_cols)
-        outlier_detector.fit(self.train)
-
-        # Mark outliers (but don't remove - keep all data for training)
-        outliers_train = outlier_detector.find_outliers(self.train)
-        logger.info(f"Outliers in train set: {outliers_train.sum()} "
-                   f"({outliers_train.sum()/len(self.train)*100:.2f}%)")
-
-        # Cap outliers to upper/lower bounds instead of removing
         for col in self.numeric_cols:
             Q1 = self.train[col].quantile(0.25)
             Q3 = self.train[col].quantile(0.75)
             IQR = Q3 - Q1
+
             lower_bound = Q1 - 1.5 * IQR
             upper_bound = Q3 + 1.5 * IQR
+
+            # Count outliers
+            outliers_train = ((self.train[col] < lower_bound) |
+                             (self.train[col] > upper_bound)).sum()
+            if outliers_train > 0:
+                logger.debug(f"{col}: {outliers_train} outliers ({outliers_train/len(self.train)*100:.2f}%)")
 
             # Cap values
             self.train[col] = self.train[col].clip(lower_bound, upper_bound)
             self.val[col] = self.val[col].clip(lower_bound, upper_bound)
             self.test[col] = self.test[col].clip(lower_bound, upper_bound)
 
-        logger.info("✓ Outliers capped to bounds")
-
-    def encode_categorical(self):
-        """Encode categorical variables"""
-        logger.info("\n" + "=" * 60)
-        logger.info("ENCODING CATEGORICAL VARIABLES")
-        logger.info("=" * 60)
-
-        if len(self.categorical_cols) == 0:
-            logger.info("✓ No categorical columns to encode")
-            return
-
-        encoder = OrdinalEncoder(variables=self.categorical_cols)
-        encoder.fit(self.train)
-
-        self.train = encoder.transform(self.train)
-        self.val = encoder.transform(self.val)
-        self.test = encoder.transform(self.test)
-
-        self.preprocessor['encoder'] = encoder
-        logger.info(f"✓ Encoded {len(self.categorical_cols)} categorical columns")
+        logger.info("✓ Outliers capped to IQR bounds")
 
     def create_derived_features(self):
-        """Create derived features (domain-specific)"""
+        """Create network-specific derived features from UNSW-NB15"""
         logger.info("\n" + "=" * 60)
-        logger.info("CREATING DERIVED FEATURES")
+        logger.info("CREATING DERIVED FEATURES (Network-specific)")
         logger.info("=" * 60)
-
-        # Example: Create interaction features
-        # Adjust based on your actual features
 
         for df in [self.train, self.val, self.test]:
-            # Feature 1: Ratio features
-            if 'bytes_in' in df.columns and 'bytes_out' in df.columns:
-                df['bytes_ratio'] = (df['bytes_in'] + 1) / (df['bytes_out'] + 1)
+            # Bytes ratio
+            if 'sbytes' in df.columns and 'dbytes' in df.columns:
+                df['bytes_ratio'] = (df['sbytes'] + 1) / (df['dbytes'] + 1)
 
-            # Feature 2: Temporal patterns
-            if 'duration' in df.columns:
-                df['high_duration'] = (df['duration'] > df['duration'].median()).astype(int)
+            # Packet ratio
+            if 'spkts' in df.columns and 'dpkts' in df.columns:
+                df['packet_ratio'] = (df['spkts'] + 1) / (df['dpkts'] + 1)
 
-            # Feature 3: Connection density
-            if 'packets_total' in df.columns and 'duration' in df.columns:
-                df['packet_rate'] = df['packets_total'] / (df['duration'] + 1)
+            # Bytes per packet (both directions)
+            if 'sbytes' in df.columns and 'spkts' in df.columns:
+                df['src_bytes_per_pkt'] = (df['sbytes'] + 1) / (df['spkts'] + 1)
+            if 'dbytes' in df.columns and 'dpkts' in df.columns:
+                df['dst_bytes_per_pkt'] = (df['dbytes'] + 1) / (df['dpkts'] + 1)
 
-        logger.info("✓ Derived features created")
+            # Connection duration patterns
+            if 'dur' in df.columns:
+                df['high_duration'] = (df['dur'] > df['dur'].median()).astype(int)
+                df['log_duration'] = np.log1p(df['dur'])
+
+            # TTL analysis
+            if 'sttl' in df.columns and 'dttl' in df.columns:
+                df['ttl_diff'] = np.abs(df['sttl'] - df['dttl'])
+
+        # Update numeric_cols to include new features
+        self.numeric_cols = [c for c in self.train.columns
+                            if c != self.target_col]
+
+        logger.info(f"✓ Created derived features. Total numeric: {len(self.numeric_cols)}")
 
     def scale_features(self):
-        """Scale numeric features"""
+        """Scale numeric features using RobustScaler"""
         logger.info("\n" + "=" * 60)
-        logger.info("SCALING FEATURES")
+        logger.info("SCALING FEATURES (RobustScaler)")
         logger.info("=" * 60)
 
-        # Use RobustScaler for data with outliers
+        # RobustScaler is resistant to outliers
         scaler = RobustScaler()
         self.train[self.numeric_cols] = scaler.fit_transform(
             self.train[self.numeric_cols])
@@ -179,43 +186,34 @@ class FeatureEngineer:
         logger.info(f"✓ Scaled {len(self.numeric_cols)} numeric features")
 
     def remove_low_variance_features(self, threshold=0.01):
-        """Remove features with low variance"""
+        """Remove features with very low variance"""
         logger.info("\n" + "=" * 60)
         logger.info("REMOVING LOW VARIANCE FEATURES")
         logger.info("=" * 60)
 
-        variances = self.train[self.numeric_cols].var()
-        low_var_features = variances[variances < threshold].index.tolist()
+        variance_selector = VarianceThreshold(threshold=threshold)
+        self.train[self.numeric_cols] = variance_selector.fit_transform(
+            self.train[self.numeric_cols])
+
+        low_var_features = set(self.numeric_cols) - set(
+            np.array(self.numeric_cols)[variance_selector.get_support()])
 
         if low_var_features:
             logger.warning(f"Removing {len(low_var_features)} low variance features:")
             for feat in low_var_features:
-                logger.warning(f"  {feat}: variance = {variances[feat]:.6f}")
+                logger.warning(f"  {feat}")
 
-            self.train = self.train.drop(columns=low_var_features)
-            self.val = self.val.drop(columns=low_var_features)
-            self.test = self.test.drop(columns=low_var_features)
+            self.val[self.numeric_cols] = variance_selector.transform(
+                self.val[self.numeric_cols])
+            self.test[self.numeric_cols] = variance_selector.transform(
+                self.test[self.numeric_cols])
 
-            # Update numeric_cols list
-            self.numeric_cols = [c for c in self.numeric_cols
-                                if c not in low_var_features]
+            self.numeric_cols = list(np.array(self.numeric_cols)[
+                variance_selector.get_support()])
         else:
             logger.info("✓ No low variance features to remove")
 
-    def analyze_feature_importance(self):
-        """Analyze feature importance post-engineering"""
-        logger.info("\n" + "=" * 60)
-        logger.info("FEATURE IMPORTANCE STATISTICS")
-        logger.info("=" * 60)
-
-        numeric_df = self.train[self.numeric_cols]
-        importance = numeric_df.var().sort_values(ascending=False)
-
-        logger.info("\nTop 10 Features by Variance:")
-        for idx, (feat, var) in enumerate(importance.head(10).items(), 1):
-            logger.info(f"  {idx}. {feat}: {var:.4f}")
-
-        return importance
+        self.preprocessor['variance_selector'] = variance_selector
 
     def validate_output(self):
         """Validate preprocessed data"""
@@ -230,29 +228,28 @@ class FeatureEngineer:
 
         # Check shapes
         assert self.train.shape[1] == self.val.shape[1] == self.test.shape[1], \
-            "Feature count mismatch between sets!"
+            "Feature count mismatch!"
 
         # Check dtypes
-        numeric_dtypes = [np.float64, np.int64]
-        assert all(self.train.dtypes.isin(numeric_dtypes)), "Non-numeric data remains!"
+        assert all(pd.api.types.is_numeric_dtype(self.train[c])
+                   for c in self.numeric_cols), "Non-numeric data remains!"
 
         logger.info("✓ All validations passed")
-        logger.info(f"Final feature count: {self.train.shape[1]}")
+        logger.info(f"✓ Final shape: Train {self.train.shape} | Val {self.val.shape} | Test {self.test.shape}")
 
     def fit_and_transform(self):
-        """Run complete pipeline"""
+        """Run complete feature engineering pipeline"""
         logger.info("\n" + "=" * 60)
-        logger.info("STARTING FEATURE ENGINEERING PIPELINE")
+        logger.info("STARTING UNSW-NB15 FEATURE ENGINEERING")
         logger.info("=" * 60)
 
         self.identify_columns()
+        self.drop_non_numeric_columns()
         self.handle_missing_values()
         self.handle_outliers()
-        self.encode_categorical()
         self.create_derived_features()
         self.scale_features()
         self.remove_low_variance_features()
-        self.analyze_feature_importance()
         self.validate_output()
 
         logger.info("\n" + "=" * 60)
@@ -275,28 +272,30 @@ if __name__ == "__main__":
     train_processed, val_processed, test_processed, preprocessor = engineer.fit_and_transform()
 
     # Save processed data
-    train_processed.to_csv("data/train/train_processed.csv", index=False)
-    val_processed.to_csv("data/train/val_processed.csv", index=False)
-    test_processed.to_csv("data/test/test_processed.csv", index=False)
+    output_dir = Path("data")
+    train_processed.to_csv(output_dir / "train" / "train_processed.csv", index=False)
+    val_processed.to_csv(output_dir / "train" / "val_processed.csv", index=False)
+    test_processed.to_csv(output_dir / "test" / "test_processed.csv", index=False)
 
-    # Save preprocessor for later use
+    # Save preprocessor
     with open("ml_model/training/preprocessor.pkl", 'wb') as f:
         pickle.dump(preprocessor, f)
 
-    logger.info("\n✓ Processed data saved to data/train/ and data/test/")
+    logger.info("\n✓ Processed data saved")
     logger.info("✓ Preprocessor saved to ml_model/training/preprocessor.pkl")
 ```
 
 ---
 
-### Step 2: Install Feature Engineering Package
+### Step 2: Update Requirements (if needed)
 
-```bash
-# Install feature-engine for advanced preprocessing
-pip install feature-engine
+The feature engineering script uses standard scikit-learn packages that are already in `requirements.txt`. No additional packages needed.
 
-# Update requirements.txt
-echo "feature-engine==1.6.0" >> requirements.txt
+Verify your requirements include:
+```
+pandas==2.1.3
+numpy==1.26.2
+scikit-learn==1.3.2
 ```
 
 ---

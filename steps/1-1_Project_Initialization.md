@@ -18,7 +18,7 @@ Set up the complete project structure, version control, virtual environment, and
 
 ```bash
 # Navigate to your project directory
-cd /path/to/projet\ 2
+cd /path/to/projet\2
 
 # Create main directory structure
 mkdir -p backend/{app,tests,models}
@@ -572,15 +572,15 @@ docker-compose --version
 
 ## ✅ Checklist
 
-- [ ] Directory structure created
-- [ ] Git initialized with .gitignore
-- [ ] Virtual environment activated
-- [ ] requirements.txt created
-- [ ] Docker & docker-compose.yml configured
-- [ ] Placeholder Python files created
-- [ ] README.md created
-- [ ] First commit made (`git add . && git commit -m "Initial setup"`)
-- [ ] All imports verified (fastapi, pandas, sklearn, etc.)
+- [x] Directory structure created
+- [x] Git initialized with .gitignore
+- [x] Virtual environment activated
+- [x] requirements.txt created
+- [x] Docker & docker-compose.yml configured
+- [x] Placeholder Python files created
+- [x] README.md created
+- [x] First commit made (`git add . && git commit -m "Initial setup"`)
+- [x] All imports verified (fastapi, pandas, sklearn, etc.)
 
 ---
 

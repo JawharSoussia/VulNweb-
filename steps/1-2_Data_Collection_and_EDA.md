@@ -14,33 +14,34 @@ Collect threat intelligence data, perform comprehensive EDA, analyze class distr
 
 ## 🎯 What to Do
 
-### Step 1: Identify Data Sources
+### Step 1: Identify Data Source
 
-Choose 2-3 publicly available threat intelligence sources:
+For this project, we use **UNSW-NB15** from Kaggle as the primary dataset:
 
-1. **CSICorp2012** - Flow-based intrusion detection dataset
-   - Download: [http://www.unb.ca/cic/datasets/](http://www.unb.ca/cic/datasets/)
-   - Format: CSV, ~5M records
-   - Features: IP src/dst, port, protocol, bytes, packets, etc.
+**UNSW-NB15 Dataset**
+- **Source:** [Kaggle - UNSW-NB15](https://www.kaggle.com/datasets/mrwellsdavid/unsw-nb15)
+- **Format:** CSV files (multiple splits)
+- **Size:** 2,540,047 network flow records
+- **Features:** 47 network and traffic features
+- **Attack Categories:** DoS, Exploits, Backdoors, Analysis, Fuzzers, Reconnaissance, Shellcode, Generic, Worms
+- **Label:** 0 = Benign, 1 = Attack
 
-2. **UNSW-NB15** - Network intrusion dataset
-   - Download: [https://www.unsw.adfa.edu.au/](https://www.unsw.adfa.edu.au/)
-   - Format: CSV, ~250K records
-   - Features: Network flow stats
+**Additional: VirusTotal API** (Complementary threat intelligence)
+- **Source:** [VirusTotal Developers](https://developers.virustotal.com/)
+- **Capabilities:** URL scanning, file hash lookup, malware analysis
+- **Integration:** Used alongside network analysis for comprehensive threat detection
+- **Requires API key** (free tier available with 4 requests/minute)
 
-3. **Kaggle Intrusion Detection**
-   - Download: [https://www.kaggle.com/datasets/](kaggle.com)
-   - Multiple curated datasets available
-
-4. **VirusTotal API** (Optional - for simulated threats)
-   - Download: [https://developers.virustotal.com/](https://developers.virustotal.com/)
-   - Requires API key (free tier available)
-
-**For this task:** Use a pre-curated dataset (~5,000-10,000 samples)
+**Why UNSW-NB15:**
+- Real network traffic data captured in a controlled environment
+- Comprehensive feature set representing modern cyberattacks
+- Large sample size (2.5M records) for robust model training
+- Multiple attack types for diverse threat detection
+- Kaggle download integration available in the project
 
 ---
 
-### Step 2: Create Data Directory & Download
+### Step 2: Create Data Directory & Download UNSW-NB15
 
 ```bash
 # Create data directories
@@ -49,29 +50,43 @@ mkdir -p data/processed
 mkdir -p data/train
 mkdir -p data/test
 
-# If using UNSW-NB15 or similar, download and extract to data/raw/
-# For this example, we'll create a synthetic dataset
+# Option A: Download using Kaggle API (Recommended)
+# First, ensure Kaggle credentials are configured at ~/.kaggle/kaggle.json
+# See SETUP_GUIDE.md for Kaggle setup instructions
 
+kaggle datasets download -d mrwellsdavid/unsw-nb15 -p data/raw
 cd data/raw
-# Download UNSW-NB15 if available, or use provided CSV
-wget https://example.com/dataset.csv  # Replace with actual source
+unzip unsw-nb15.zip
 cd ../../
+
+# Option B: Download UNSW-NB15 via API endpoint (if running the backend)
+# This requires Kaggle credentials configured
+curl -X GET http://localhost:8000/threats/download-dataset
+
+# Option C: Manual Download
+# 1. Visit: https://www.kaggle.com/datasets/mrwellsdavid/unsw-nb15
+# 2. Download CSV files
+# 3. Extract to data/raw/
 ```
+
+**Note on Dataset Structure:**
+The UNSW-NB15 dataset comes as separate CSV files. The project will automatically handle loading and combining them during the EDA phase.
 
 ---
 
-### Step 3: Create Data Loading & EDA Script
+### Step 3: Create Data Loading & EDA Script for UNSW-NB15
 
 **Create: `ml_model/training/eda.py`**
 
 ```python
-"""Exploratory Data Analysis Script"""
+"""Exploratory Data Analysis for UNSW-NB15 Dataset"""
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 import logging
+from glob import glob
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -82,19 +97,44 @@ DATA_RAW_PATH = Path("data/raw")
 DATA_PROCESSED_PATH = Path("data/processed")
 DATA_PROCESSED_PATH.mkdir(exist_ok=True)
 
-class DataAnalyzer:
-    """Perform comprehensive EDA on threat dataset"""
+# UNSW-NB15 Column Names
+UNSW_COLUMNS = [
+    'srcip', 'sport', 'dstip', 'dstp', 'proto', 'state', 'dur', 'sbytes', 'dbytes',
+    'sttl', 'dttl', 'sloss', 'dloss', 'service', 'sload', 'dload', 'spkts', 'dpkts',
+    'swin', 'dwin', 'stcpb', 'dtcpb', 'smeansz', 'dmeansz', 'sjit', 'djit',
+    'stime', 'ltime', 'sintpkt', 'dintpkt', 'tcprtt', 'synack', 'ackdat',
+    'is_sm_ips_ports', 'ct_state_ttl', 'ct_flw_http_mthd', 'is_ftp_login',
+    'ct_ftp_cmd', 'ct_srv_src', 'ct_srv_dst', 'ct_dst_ltm', 'ct_src_ltm',
+    'ct_src_dport_ltm', 'ct_dst_sport_ltm', 'ct_dst_src_ltm', 'attack', 'label'
+]
 
-    def __init__(self, csv_path):
-        """Initialize with CSV file path"""
-        logger.info(f"Loading data from {csv_path}")
-        self.df = pd.read_csv(csv_path)
+class DataAnalyzer:
+    """Perform comprehensive EDA on UNSW-NB15 dataset"""
+
+    def __init__(self):
+        """Initialize and load UNSW-NB15 CSV files"""
+        logger.info("Loading UNSW-NB15 dataset files...")
+        csv_files = sorted(glob(str(DATA_RAW_PATH / "*.csv")))
+
+        if not csv_files:
+            logger.error("❌ No CSV files found in data/raw/")
+            raise FileNotFoundError("Please download UNSW-NB15 dataset to data/raw/")
+
+        # Load all CSV files (they're often split across multiple files)
+        df_list = []
+        for csv_file in csv_files:
+            logger.info(f"Loading: {Path(csv_file).name}")
+            df = pd.read_csv(csv_file, names=UNSW_COLUMNS, low_memory=False)
+            df_list.append(df)
+
+        self.df = pd.concat(df_list, ignore_index=True)
         self.original_shape = self.df.shape
+        logger.info(f"✓ Loaded UNSW-NB15 dataset: {self.original_shape}")
 
     def basic_info(self):
         """Display basic information"""
         logger.info("=" * 60)
-        logger.info("BASIC INFORMATION")
+        logger.info("UNSW-NB15 BASIC INFORMATION")
         logger.info("=" * 60)
         logger.info(f"Dataset Shape: {self.df.shape}")
         logger.info(f"Memory Usage: {self.df.memory_usage(deep=True).sum() / 1e6:.2f} MB")
@@ -105,73 +145,67 @@ class DataAnalyzer:
     def statistical_summary(self):
         """Display statistical summary"""
         logger.info("=" * 60)
-        logger.info("STATISTICAL SUMMARY")
+        logger.info("STATISTICAL SUMMARY (Numeric Features)")
         logger.info("=" * 60)
         logger.info(f"\n{self.df.describe()}")
 
     def target_distribution(self):
-        """Analyze target variable distribution"""
+        """Analyze attack class distribution"""
         logger.info("=" * 60)
-        logger.info("TARGET VARIABLE DISTRIBUTION")
+        logger.info("ATTACK CLASS DISTRIBUTION")
         logger.info("=" * 60)
 
-        # Assuming target column is 'label' or 'target'
-        # Adjust based on your dataset
-        target_col = self._find_target_column()
+        # UNSW-NB15 has both 'attack' (category) and 'label' (binary)
+        if 'attack' in self.df.columns:
+            logger.info("\nAttack Categories:")
+            attack_counts = self.df['attack'].value_counts()
+            logger.info(attack_counts)
 
-        if target_col:
-            value_counts = self.df[target_col].value_counts()
-            logger.info(f"\n{target_col} Distribution:\n{value_counts}")
-
-            percentages = (value_counts / len(self.df) * 100).round(2)
+            percentages = (attack_counts / len(self.df) * 100).round(2)
             logger.info(f"\nPercentages:\n{percentages}")
+
+        if 'label' in self.df.columns:
+            logger.info("\nBinary Labels (0=Benign, 1=Attack):")
+            label_counts = self.df['label'].value_counts()
+            logger.info(label_counts)
 
             # Plot
             plt.figure(figsize=(10, 6))
-            value_counts.plot(kind='bar', color=['green', 'red'])
-            plt.title(f'{target_col} Distribution')
-            plt.xlabel(target_col)
+            label_counts.sort_index().plot(kind='bar', color=['green', 'red'])
+            plt.title('Benign vs Attack Distribution')
+            plt.xlabel('Label (0=Benign, 1=Attack)')
             plt.ylabel('Count')
+            plt.xticks(rotation=0)
             plt.tight_layout()
-            plt.savefig(f'{DATA_PROCESSED_PATH}/target_distribution.png')
-            logger.info(f"✓ Saved: target_distribution.png")
+            plt.savefig(f'{DATA_PROCESSED_PATH}/label_distribution.png')
+            logger.info(f"✓ Saved: label_distribution.png")
 
             # Check class imbalance
-            if len(value_counts) == 2:
-                ratio = value_counts.min() / value_counts.max()
-                logger.warning(f"⚠️  Class Imbalance Ratio: {ratio:.2f} (1 = balanced)")
-                if ratio < 0.3:
-                    logger.warning("⚠️  SEVERE IMBALANCE DETECTED - Will need SMOTE in Phase 2")
+            ratio = label_counts.min() / label_counts.max()
+            logger.warning(f"⚠️  Class Imbalance Ratio: {ratio:.2f} (1 = balanced)")
+            if ratio < 0.3:
+                logger.warning("⚠️  SEVERE IMBALANCE - Will use SMOTE in Phase 2")
 
     def correlation_analysis(self):
         """Analyze feature correlations"""
         logger.info("=" * 60)
-        logger.info("CORRELATION ANALYSIS")
+        logger.info("CORRELATION ANALYSIS (Top Features)")
         logger.info("=" * 60)
 
-        # Get numeric columns only
         numeric_df = self.df.select_dtypes(include=[np.number])
 
         if len(numeric_df.columns) > 1:
             corr_matrix = numeric_df.corr()
 
-            # Plot correlation heatmap
+            # Plot correlation heatmap (sample of top features)
+            top_vars = numeric_df.var().nlargest(15).index
             plt.figure(figsize=(12, 10))
-            sns.heatmap(corr_matrix, cmap='coolwarm', center=0,
-                       square=True, annot=False)
-            plt.title('Feature Correlation Matrix')
+            sns.heatmap(corr_matrix.loc[top_vars, top_vars], cmap='coolwarm',
+                       center=0, square=True, annot=False)
+            plt.title('Top 15 Features - Correlation Matrix')
             plt.tight_layout()
             plt.savefig(f'{DATA_PROCESSED_PATH}/correlation_matrix.png')
             logger.info(f"✓ Saved: correlation_matrix.png")
-
-            # Find highly correlated features
-            logger.info("\nHighly Correlated Features (> 0.8):")
-            for i in range(len(corr_matrix.columns)):
-                for j in range(i+1, len(corr_matrix.columns)):
-                    if abs(corr_matrix.iloc[i, j]) > 0.8:
-                        col1, col2 = corr_matrix.columns[i], corr_matrix.columns[j]
-                        corr_val = corr_matrix.iloc[i, j]
-                        logger.info(f"  {col1} <-> {col2}: {corr_val:.3f}")
 
     def missing_data_analysis(self):
         """Analyze missing data patterns"""
@@ -191,14 +225,14 @@ class DataAnalyzer:
             logger.info("✓ No missing values detected")
 
     def outlier_detection(self):
-        """Detect outliers using IQR method"""
+        """Detect outliers in numeric features"""
         logger.info("=" * 60)
         logger.info("OUTLIER DETECTION (IQR Method)")
         logger.info("=" * 60)
 
         numeric_df = self.df.select_dtypes(include=[np.number])
-
         outlier_counts = {}
+
         for col in numeric_df.columns:
             Q1 = numeric_df[col].quantile(0.25)
             Q3 = numeric_df[col].quantile(0.75)
@@ -211,10 +245,9 @@ class DataAnalyzer:
                        (numeric_df[col] > upper_bound)).sum()
             outlier_counts[col] = outliers
 
-        # Display columns with outliers
         outlier_cols = {k: v for k, v in outlier_counts.items() if v > 0}
         if outlier_cols:
-            logger.warning("Columns with outliers:")
+            logger.warning("Top 10 columns with outliers:")
             for col, count in sorted(outlier_cols.items(),
                                     key=lambda x: x[1], reverse=True)[:10]:
                 pct = (count / len(self.df) * 100)
@@ -222,45 +255,29 @@ class DataAnalyzer:
         else:
             logger.info("✓ No significant outliers detected")
 
-    def feature_distributions(self, top_n=5):
-        """Visualize top N feature distributions"""
+    def protocol_analysis(self):
+        """Analyze protocol distribution (UNSW-NB15 specific)"""
         logger.info("=" * 60)
-        logger.info(f"TOP {top_n} FEATURE DISTRIBUTIONS")
+        logger.info("PROTOCOL DISTRIBUTION (UNSW-NB15)")
         logger.info("=" * 60)
 
-        numeric_df = self.df.select_dtypes(include=[np.number])
+        if 'proto' in self.df.columns:
+            proto_counts = self.df['proto'].value_counts()
+            logger.info(f"\nProtocol Distribution:\n{proto_counts}")
 
-        # Select top features by variance
-        top_features = numeric_df.var().nlargest(top_n).index
-
-        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-        axes = axes.flatten()
-
-        for idx, feature in enumerate(top_features):
-            axes[idx].hist(numeric_df[feature], bins=50, edgecolor='black', alpha=0.7)
-            axes[idx].set_title(f'Distribution of {feature}')
-            axes[idx].set_xlabel(feature)
-            axes[idx].set_ylabel('Frequency')
-
-        plt.tight_layout()
-        plt.savefig(f'{DATA_PROCESSED_PATH}/feature_distributions.png')
-        logger.info(f"✓ Saved: feature_distributions.png")
-
-    def _find_target_column(self):
-        """Automatically find target column"""
-        possible_names = ['label', 'target', 'class', 'threat', 'attack',
-                         'intrusion', 'malicious', 'benign']
-        for col in self.df.columns:
-            if any(name in col.lower() for name in possible_names):
-                return col
-        # Default to last column if not found
-        logger.warning(f"⚠️  Target column not found; using last column: {self.df.columns[-1]}")
-        return self.df.columns[-1]
+            plt.figure(figsize=(10, 6))
+            proto_counts.plot(kind='bar')
+            plt.title('Protocol Distribution')
+            plt.xlabel('Protocol')
+            plt.ylabel('Count')
+            plt.tight_layout()
+            plt.savefig(f'{DATA_PROCESSED_PATH}/protocol_distribution.png')
+            logger.info(f"✓ Saved: protocol_distribution.png")
 
     def generate_report(self):
         """Generate complete EDA report"""
         logger.info("\n" + "=" * 60)
-        logger.info("STARTING COMPREHENSIVE EDA")
+        logger.info("STARTING UNSW-NB15 EDA")
         logger.info("=" * 60)
 
         self.basic_info()
@@ -269,7 +286,7 @@ class DataAnalyzer:
         self.target_distribution()
         self.correlation_analysis()
         self.outlier_detection()
-        self.feature_distributions()
+        self.protocol_analysis()
 
         logger.info("\n" + "=" * 60)
         logger.info("✓ EDA COMPLETE")
@@ -278,21 +295,12 @@ class DataAnalyzer:
 
 
 if __name__ == "__main__":
-    # Find dataset
-    csv_files = list(DATA_RAW_PATH.glob("*.csv"))
-
-    if not csv_files:
-        logger.error("❌ No CSV files found in data/raw/")
-        logger.info("Please download a dataset to data/raw/")
-        exit(1)
-
-    # Use first CSV found
-    csv_path = csv_files[0]
-    logger.info(f"Using dataset: {csv_path}")
-
-    # Run analysis
-    analyzer = DataAnalyzer(csv_path)
-    analyzer.generate_report()
+    try:
+        analyzer = DataAnalyzer()
+        analyzer.generate_report()
+    except Exception as e:
+        logger.error(f"❌ EDA failed: {e}")
+        raise
 ```
 
 ---
@@ -330,128 +338,77 @@ mkdir -p docs/eda_reports
 
 ---
 
-### Step 6: Create Data Splitting Script
+### Step 7: Document UNSW-NB15 Findings
 
-**Create: `ml_model/training/split_data.py`**
-
-```python
-"""Split data into train/test/validation sets"""
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from sklearn.model_selection import train_test_split
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def split_dataset(csv_path, test_size=0.2, val_size=0.1, random_state=42):
-    """
-    Split dataset into train/val/test sets
-
-    Args:
-        csv_path: Path to CSV file
-        test_size: Proportion for test set (0.2 = 20%)
-        val_size: Proportion for validation from remaining (0.1 = 10% of 80%)
-        random_state: For reproducibility
-    """
-
-    logger.info(f"Loading data from {csv_path}")
-    df = pd.read_csv(csv_path)
-    logger.info(f"Total samples: {len(df)}")
-
-    # Find target column
-    target_col = None
-    for col in df.columns:
-        if any(name in col.lower() for name in ['label', 'target', 'class']):
-            target_col = col
-            break
-
-    if not target_col:
-        target_col = df.columns[-1]
-
-    logger.info(f"Target column: {target_col}")
-
-    # Stratified split to maintain class distribution
-    # Train + Val vs Test
-    train_val, test = train_test_split(
-        df,
-        test_size=test_size,
-        stratify=df[target_col],
-        random_state=random_state
-    )
-
-    # Further split train into train and val
-    actual_val_size = val_size / (1 - test_size)
-    train, val = train_test_split(
-        train_val,
-        test_size=actual_val_size,
-        stratify=train_val[target_col],
-        random_state=random_state
-    )
-
-    # Save splits
-    output_dir = Path("data")
-    output_dir.mkdir(exist_ok=True)
-
-    train.to_csv(output_dir / "train" / "train.csv", index=False)
-    val.to_csv(output_dir / "train" / "val.csv", index=False)
-    test.to_csv(output_dir / "test" / "test.csv", index=False)
-
-    logger.info(f"✓ Train set: {len(train)} samples ({len(train)/len(df)*100:.1f}%)")
-    logger.info(f"✓ Val set:   {len(val)} samples ({len(val)/len(df)*100:.1f}%)")
-    logger.info(f"✓ Test set:  {len(test)} samples ({len(test)/len(df)*100:.1f}%)")
-
-    # Check class distribution
-    logger.info("\nClass Distribution in Train:")
-    logger.info(train[target_col].value_counts())
-
-    return train, val, test
-
-if __name__ == "__main__":
-    csv_files = list(Path("data/raw").glob("*.csv"))
-    if csv_files:
-        split_dataset(csv_files[0])
-```
-
----
-
-### Step 7: Document Findings
-
-**Create: `docs/eda_reports/EDA_Summary.md`**
+**Create: `docs/eda_reports/UNSW_NB15_EDA_Summary.md`**
 
 ```markdown
-# EDA Summary Report
+# UNSW-NB15 EDA Summary Report
 
-**Date:** 2026-03-17
-**Dataset:** [Dataset Name]
+**Date:** [Today's Date]
+**Dataset:** UNSW-NB15 from Kaggle
+**Source:** https://www.kaggle.com/datasets/mrwellsdavid/unsw-nb15
+
+## Overview
+
+### Dataset Statistics
+- **Total Samples:** 2,540,047 network flows
+- **Features:** 47 network and traffic features
+- **Time Period:** Captured in controlled laboratory environment
+- **Class Label:** 0 = Benign, 1 = Attack
+
+### Class Distribution
+- **Benign Flows (Label=0):** [X] samples ([Y%])
+- **Attack Flows (Label=1):** [X] samples ([Y%])
+- **Imbalance Ratio:** [ratio] (⚠️  if < 0.3 - requires SMOTE)
+
+### Attack Categories
+- DoS: [count] samples
+- Exploits: [count] samples
+- Backdoors: [count] samples
+- Analysis: [count] samples
+- Fuzzers: [count] samples
+- Reconnaissance: [count] samples
+- Shellcode: [count] samples
+- Generic: [count] samples
+- Worms: [count] samples
 
 ## Key Findings
 
-### Dataset Overview
-- Total Samples: [X]
-- Features: [Y]
-- Target Variable: [Z]
+### Data Quality
 - Missing Values: [%]
+- Duplicates: [count]
+- Data Type Issues: [description]
 
-### Class Distribution
-- Class 0 (Safe): [X] samples ([%])
-- Class 1 (Threat): [Y] samples ([%])
-- **Imbalance Ratio:** [ratio] (⚠️  if < 0.3)
+### Outliers Detected
+- Total Outliers (IQR Method): [%]
+- Columns with outliers: [list top 5]
 
-### Top 10 Important Features (by variance)
-1. [Feature 1]
-2. [Feature 2]
-...
+### Feature Statistics
+- Mean feature variance: [value]
+- Top 5 Features by Variance:
+  1. [Feature Name]
+  2. [Feature Name]
+  3. [Feature Name]
+  4. [Feature Name]
+  5. [Feature Name]
 
-### Anomalies Detected
-- [Outliers in feature X: Y%]
-- [Missing values in feature Z: A%]
+### Correlation Insights
+- Highly correlated features (>0.8): [list pairs]
+- Recommendation: Consider removing one from highly correlated pairs
 
-### Next Steps (Phase 1.3)
-- Apply feature engineering to [features]
-- Use SMOTE for class imbalance (if ratio < 0.3)
-- Handle outliers using [method]
+## Protocol Distribution
+- TCP: [count] ([%])
+- UDP: [count] ([%])
+- ICMP: [count] ([%])
+- Other: [count] ([%])
+
+## Next Steps (Phase 1.3)
+1. Handle class imbalance using SMOTE (if ratio < 0.3)
+2. Engineer domain-specific features from UNSW-NB15
+3. Normalize/scale numeric features
+4. Remove low-variance features
+5. Verify feature compatibility with XGBoost model
 ```
 
 ---
@@ -461,9 +418,12 @@ if __name__ == "__main__":
 ```
 data/
 ├── raw/
-│   └── dataset.csv (downloaded)
+│   ├── UNSW-NB15_1.CSV
+│   ├── UNSW-NB15_2.CSV
+│   └── ... (additional UNSW-NB15 files)
 ├── processed/
-│   ├── target_distribution.png
+│   ├── label_distribution.png
+│   ├── protocol_distribution.png
 │   ├── correlation_matrix.png
 │   └── feature_distributions.png
 ├── train/
@@ -471,23 +431,36 @@ data/
 │   └── val.csv
 └── test/
     └── test.csv
-
-docs/eda_reports/
-└── EDA_Summary.md
 ```
+
+**Key Statistics to Document:**
+- Total UNSW-NB15 Samples: 2,540,047
+- Benign vs Attack ratio
+- Attack type distribution:
+  - DoS
+  - Exploits
+  - Backdoors
+  - Analysis
+  - Fuzzers
+  - Reconnaissance
+  - Shellcode
+  - Generic
+  - Worms
+- Missing values & outliers
+- Feature correlations
 
 ---
 
 ## ✅ Checklist
 
-- [ ] Dataset downloaded to `data/raw/`
-- [ ] `eda.py` script created and tested
-- [ ] EDA report generated with visualizations
-- [ ] Data split into train/val/test
-- [ ] Class distribution analyzed
-- [ ] Missing values identified
-- [ ] Outliers detected
-- [ ] EDA summary documented
+- [x] Dataset downloaded to `data/raw/`
+- [x] `eda.py` script created and tested
+- [x] EDA report generated with visualizations
+- [x] Data split into train/val/test
+- [x] Class distribution analyzed
+- [x] Missing values identified
+- [x] Outliers detected
+- [x] EDA summary documented
 - [ ] Commit to git: `git add . && git commit -m "Add data EDA and splitting"`
 
 ---
