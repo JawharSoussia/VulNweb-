@@ -52,4 +52,4 @@ python-json-logger==2.0.7
 
 # Utilities
 python-dotenv==1.0.0
-pyyaml==6.0.1"shap==0.43.0" 
+pyyaml==6.0.1 
