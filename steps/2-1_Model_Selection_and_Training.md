@@ -371,18 +371,18 @@ def tune_xgboost(X, y):
 
 ## ✅ Checklist
 
-- [ ] Training script created
-- [ ] All three models trained:
-  - [ ] Logistic Regression (baseline)
-  - [ ] Random Forest
-  - [ ] XGBoost
-- [ ] Cross-validation implemented (5-fold)
-- [ ] Model comparison completed
-- [ ] Best model selected
-- [ ] Feature importance extracted
-- [ ] Model saved to `.pkl`
-- [ ] Metadata saved
-- [ ] Commit: `git add . && git commit -m "Add model training pipeline"`
+- [x] Training script created
+- [x] All three models trained:
+  - [x] Logistic Regression (baseline)
+  - [x] Random Forest
+  - [x] XGBoost
+- [x] Cross-validation implemented (5-fold)
+- [x] Model comparison completed
+- [x] Best model selected
+- [x] Feature importance extracted
+- [x] Model saved to `.pkl`
+- [x] Metadata saved
+- [x] Commit: `git add . && git commit -m "Add model training pipeline"`
 
 ---
 

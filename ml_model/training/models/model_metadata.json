@@ -1,0 +1,61 @@
+{
+  "model_name": "XGBoost",
+  "trained_at": "2026-03-24T18:26:44.070360",
+  "cv_results": {
+    "LogisticRegression": {
+      "f1": 0.9196338338973318,
+      "recall": 0.9259975580126216,
+      "precision": 0.9133606110102054,
+      "auc": 0.9861280333414315
+    },
+    "RandomForest": {
+      "f1": 0.9551478438774362,
+      "recall": 0.9994664250757364,
+      "precision": 0.9145949658904652,
+      "auc": 0.9997448689949107
+    },
+    "XGBoost": {
+      "f1": 0.9657599370152308,
+      "recall": 0.9975989117039757,
+      "precision": 0.9358911795335475,
+      "auc": 0.9998229428884221
+    }
+  },
+  "feature_names": [
+    "dintpkt",
+    "sport",
+    "sttl",
+    "dloss",
+    "ct_srv_src",
+    "ltime",
+    "ackdat",
+    "dload",
+    "ct_srv_dst",
+    "djit",
+    "swin",
+    "stcpb",
+    "dtcpb",
+    "ct_src_ltm",
+    "dttl",
+    "ct_dst_src_ltm",
+    "sjit",
+    "dwin",
+    "tcprtt",
+    "synack",
+    "stime",
+    "spkts",
+    "ct_src_dport_ltm",
+    "sload",
+    "dpkts",
+    "dur",
+    "ct_dst_ltm",
+    "sintpkt",
+    "packet_ratio",
+    "src_bytes_per_pkt",
+    "dst_bytes_per_pkt",
+    "high_duration",
+    "log_duration",
+    "ttl_diff"
+  ],
+  "target_col": "label"
+}
