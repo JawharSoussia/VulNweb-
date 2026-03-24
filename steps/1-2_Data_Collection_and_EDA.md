@@ -461,7 +461,7 @@ data/
 - [x] Missing values identified
 - [x] Outliers detected
 - [x] EDA summary documented
-- [ ] Commit to git: `git add . && git commit -m "Add data EDA and splitting"`
+- [x] Commit to git: `git add . && git commit -m "Add data EDA and splitting"`
 
 ---
 

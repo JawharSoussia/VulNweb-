@@ -1,24 +1,3 @@
-# Task 1.3: Feature Engineering
-
-**Phase:** Setup & Data Preparation
-**Deadline:** Day 12
-**Status:** ⏳ Pending
-**Dependencies:** Task 1.2 complete
-
----
-
-## 📋 Objective
-Extract, engineer, and prepare features from raw data. Handle scaling, normalization, missing values, and outliers.
-
----
-
-## 🎯 What to Do
-
-### Step 1: Create Feature Engineering Pipeline for UNSW-NB15
-
-**Create: `ml_model/training/feature_engineering.py`**
-
-```python
 """Feature Engineering Pipeline for UNSW-NB15 Dataset"""
 import pandas as pd
 import numpy as np
@@ -86,7 +65,20 @@ class FeatureEngineer:
         logger.info("HANDLING MISSING VALUES")
         logger.info("=" * 60)
 
-        missing = self.train.isnull().sum()
+        # First, drop columns that are entirely empty
+        cols_to_drop = []
+        for col in self.numeric_cols:
+            if self.train[col].isnull().all():
+                cols_to_drop.append(col)
+                logger.warning(f"Dropping completely empty column: {col}")
+
+        if cols_to_drop:
+            self.numeric_cols = [c for c in self.numeric_cols if c not in cols_to_drop]
+            self.train = self.train.drop(columns=cols_to_drop)
+            self.val = self.val.drop(columns=cols_to_drop)
+            self.test = self.test.drop(columns=cols_to_drop)
+
+        missing = self.train[self.numeric_cols].isnull().sum()
         if missing.sum() == 0:
             logger.info("✓ No missing values in training set")
             return
@@ -192,24 +184,23 @@ class FeatureEngineer:
         logger.info("=" * 60)
 
         variance_selector = VarianceThreshold(threshold=threshold)
-        self.train[self.numeric_cols] = variance_selector.fit_transform(
-            self.train[self.numeric_cols])
+        variance_selector.fit(self.train[self.numeric_cols])
 
-        low_var_features = set(self.numeric_cols) - set(
-            np.array(self.numeric_cols)[variance_selector.get_support()])
+        support_mask = variance_selector.get_support()
+        low_var_features = set(np.array(self.numeric_cols)[~support_mask])
 
         if low_var_features:
             logger.warning(f"Removing {len(low_var_features)} low variance features:")
             for feat in low_var_features:
                 logger.warning(f"  {feat}")
 
-            self.val[self.numeric_cols] = variance_selector.transform(
-                self.val[self.numeric_cols])
-            self.test[self.numeric_cols] = variance_selector.transform(
-                self.test[self.numeric_cols])
+            # Update numeric_cols first
+            self.numeric_cols = list(np.array(self.numeric_cols)[support_mask])
 
-            self.numeric_cols = list(np.array(self.numeric_cols)[
-                variance_selector.get_support()])
+            # Then transform all dataframes
+            self.train = self.train[self.numeric_cols + [self.target_col]]
+            self.val = self.val[self.numeric_cols + [self.target_col]]
+            self.test = self.test[self.numeric_cols + [self.target_col]]
         else:
             logger.info("✓ No low variance features to remove")
 
@@ -264,7 +255,7 @@ if __name__ == "__main__":
 
     # Load data
     train_df = pd.read_csv("data/train/train.csv")
-    val_df = pd.read_csv("data/train/val.csv")
+    val_df = pd.read_csv("data/val/val.csv")
     test_df = pd.read_csv("data/test/test.csv")
 
     # Create engineer
@@ -283,94 +274,3 @@ if __name__ == "__main__":
 
     logger.info("\n✓ Processed data saved")
     logger.info("✓ Preprocessor saved to ml_model/training/preprocessor.pkl")
-```
-
----
-
-### Step 2: Update Requirements (if needed)
-
-The feature engineering script uses standard scikit-learn packages that are already in `requirements.txt`. No additional packages needed.
-
-Verify your requirements include:
-```
-pandas==2.1.3
-numpy==1.26.2
-scikit-learn==1.3.2
-```
-
----
-
-### Step 3: Run Feature Engineering
-
-```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Run feature engineering pipeline
-python ml_model/training/feature_engineering.py
-```
-
----
-
-### Step 4: Verify Output
-
-```bash
-# Check processed data shapes
-python << 'EOF'
-import pandas as pd
-
-train = pd.read_csv("data/train/train_processed.csv")
-val = pd.read_csv("data/train/val_processed.csv")
-test = pd.read_csv("data/test/test_processed.csv")
-
-print(f"Train shape: {train.shape}")
-print(f"Val shape: {val.shape}")
-print(f"Test shape: {test.shape}")
-print(f"\nFirst 5 rows of train:")
-print(train.head())
-print(f"\nData types:")
-print(train.dtypes)
-EOF
-```
-
----
-
-## 📊 Expected Outputs
-
-```
-data/
-├── train/
-│   ├── train_processed.csv
-│   └── val_processed.csv
-└── test/
-    └── test_processed.csv
-
-ml_model/training/
-└── preprocessor.pkl
-```
-
----
-
-## ✅ Checklist
-
-- [x] Feature engineering script created
-- [x] Missing values handled
-- [x] Outliers identified and capped
-- [x] Categorical variables encoded
-- [x] Derived features created
-- [x] Features scaled using RobustScaler
-- [x] Low variance features removed
-- [x] Processed data saved
-- [x] Preprocessor object serialized
-- [x] Data validation passed
-- [x] Commit: `git add . && git commit -m "Add feature engineering pipeline"`
-
----
-
-## 🔗 Next Steps
-
-✅ **Task 1.3 Complete** → Move to **Task 1.4: Data Quality Tests (Data Contracts)**
-
----
-
-**Created:** 2026-03-17
