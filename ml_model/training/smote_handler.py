@@ -1,24 +1,3 @@
-# Task 2.2: Class Imbalance Handling (SMOTE)
-
-**Phase:** ML Model Development
-**Deadline:** Day 20
-**Status:** ⏳ Pending
-**Dependencies:** Task 2.1 complete
-
----
-
-## 📋 Objective
-Apply SMOTE (Synthetic Minority Oversampling Technique) to handle class imbalance and improve recall for threat detection.
-
----
-
-## 🎯 What to Do
-
-### Step 1: Create SMOTE Pipeline
-
-**Create: `ml_model/training/smote_handler.py`**
-
-```python
 """SMOTE for class imbalance handling"""
 import pandas as pd
 import numpy as np
@@ -198,35 +177,3 @@ if __name__ == "__main__":
         pickle.dump(best_model, f)
 
     logger.info("\n✓ Model saved!")
-```
-
----
-
-### Step 2: Run SMOTE Handler
-
-```bash
-python ml_model/training/smote_handler.py
-```
-
----
-
-## ✅ Checklist
-
-- [x] SMOTE handler created
-- [x] Class imbalance ratio analyzed
-- [x] SMOTE applied to training data
-- [x] Model trained with SMOTE-augmented data
-- [x] Performance compared (with vs without SMOTE)
-- [x] Best model selected and saved
-- [x] Recall ≥ 90% achieved
-- [x] Commit: `git add . && git commit -m "Add SMOTE for class imbalance handling"`
-
----
-
-## 🔗 Next Steps
-
-✅ **Task 2.2 Complete** → Move to **Task 2.3: Model Evaluation**
-
----
-
-**Created:** 2026-03-17
