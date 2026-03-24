@@ -1,24 +1,3 @@
-# Task 2.4: Explainability with SHAP
-
-**Phase:** ML Model Development
-**Deadline:** Day 24
-**Status:** ⏳ Pending
-**Dependencies:** Task 2.3 complete
-
----
-
-## 📋 Objective
-Implement SHAP (SHapley Additive exPlanations) for model interpretability. Extract top 3 decision reasons per prediction.
-
----
-
-## 🎯 What to Do
-
-### Step 1: Create SHAP Explainability Module
-
-**Create: `ml_model/inference/explainer.py`**
-
-```python
 """SHAP-based Model Explainability"""
 import pandas as pd
 import numpy as np
@@ -166,44 +145,3 @@ if __name__ == "__main__":
         pickle.dump(explainer, f)
 
     logger.info("✓ Explainer saved!")
-```
-
----
-
-### Step 2: Install SHAP
-
-```bash
-pip install shap
-echo "shap==0.43.0" >> requirements.txt
-```
-
----
-
-### Step 3: Run Explainer
-
-```bash
-python ml_model/inference/explainer.py
-```
-
----
-
-## ✅ Checklist
-
-- [x] SHAP explainer created
-- [x] TreeExplainer initialized
-- [x] Top-3 explanation extraction working
-- [x] Batch explanation generation implemented
-- [x] Visualization functions created
-- [x] Explainer object saved
-- [x] Tested on sample predictions
-- [x] Commit: `git add . && git commit -m "Add SHAP model explainability"`
-
----
-
-## 🔗 Next Steps
-
-✅ **Task 2.4 Complete** → Move to **Task 2.5: Model Serialization & Packaging**
-
----
-
-**Created:** 2026-03-17
