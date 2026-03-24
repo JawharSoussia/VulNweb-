@@ -174,8 +174,13 @@ class FeatureEngineer:
         self.test[self.numeric_cols] = scaler.transform(
             self.test[self.numeric_cols])
 
+        # Clip extreme values to [-50, 50] range
+        for df in [self.train, self.val, self.test]:
+            df[self.numeric_cols] = df[self.numeric_cols].clip(-50, 50)
+
         self.preprocessor['scaler'] = scaler
         logger.info(f"✓ Scaled {len(self.numeric_cols)} numeric features")
+        logger.info("✓ Clipped extreme values to [-50, 50] range")
 
     def remove_low_variance_features(self, threshold=0.01):
         """Remove features with very low variance"""

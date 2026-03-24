@@ -374,3 +374,73 @@ ml_model/training/
 ---
 
 **Created:** 2026-03-17
+
+
+INFO:__main__:
+============================================================
+INFO:__main__:STARTING UNSW-NB15 FEATURE ENGINEERING
+INFO:__main__:============================================================
+INFO:__main__:============================================================
+INFO:__main__:IDENTIFYING FEATURES
+INFO:__main__:============================================================
+INFO:__main__:✓ Numeric columns (40): ['sloss', 'tcprtt', 'dloss', 'swin', 'stcpb']...
+INFO:__main__:✓ Categorical columns (6): ['dstip', 'proto', 'attack', 'service', 'srcip', 'state']        
+INFO:__main__:
+============================================================
+INFO:__main__:REMOVING NON-NUMERIC COLUMNS
+INFO:__main__:============================================================
+INFO:__main__:✓ Reduced train shape to: (1778032, 41)
+INFO:__main__:✓ Reduced val shape to: (381007, 41)
+INFO:__main__:✓ Reduced test shape to: (381008, 41)
+INFO:__main__:
+============================================================
+INFO:__main__:HANDLING MISSING VALUES
+INFO:__main__:============================================================
+WARNING:__main__:Dropping completely empty column: sloss
+WARNING:__main__:Dropping completely empty column: dstp
+WARNING:__main__:Found 2945973 missing values
+INFO:__main__:✓ Missing values imputed with median
+INFO:__main__:
+============================================================
+INFO:__main__:HANDLING OUTLIERS (IQR Method)
+INFO:__main__:============================================================
+INFO:__main__:✓ Outliers capped to IQR bounds
+INFO:__main__:
+============================================================
+INFO:__main__:CREATING DERIVED FEATURES (Network-specific)
+INFO:__main__:============================================================
+INFO:__main__:✓ Created derived features. Total numeric: 45
+INFO:__main__:
+============================================================
+INFO:__main__:SCALING FEATURES (RobustScaler)
+INFO:__main__:============================================================
+INFO:__main__:✓ Scaled 45 numeric features
+INFO:__main__:
+============================================================
+INFO:__main__:REMOVING LOW VARIANCE FEATURES
+INFO:__main__:============================================================
+WARNING:__main__:Removing 11 low variance features:
+WARNING:__main__:  smeansz
+WARNING:__main__:  ct_state_ttl
+WARNING:__main__:  ct_flw_http_mthd
+WARNING:__main__:  ct_dst_sport_ltm
+WARNING:__main__:  is_sm_ips_ports
+WARNING:__main__:  bytes_ratio
+WARNING:__main__:  dbytes
+WARNING:__main__:  dmeansz
+WARNING:__main__:  ct_ftp_cmd
+WARNING:__main__:  is_ftp_login
+WARNING:__main__:  sbytes
+INFO:__main__:
+============================================================
+INFO:__main__:VALIDATING PREPROCESSED DATA
+INFO:__main__:============================================================
+INFO:__main__:✓ All validations passed
+INFO:__main__:✓ Final shape: Train (1778032, 35) | Val (381007, 35) | Test (381008, 35)
+INFO:__main__:
+============================================================
+INFO:__main__:✓ FEATURE ENGINEERING COMPLETE
+INFO:__main__:============================================================
+INFO:__main__:
+✓ Processed data saved
+INFO:__main__:✓ Preprocessor saved to ml_model/training/preprocessor.pkl

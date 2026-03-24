@@ -539,15 +539,15 @@ htmlcov/  (from test coverage)
 
 ## ✅ Checklist
 
-- [ ] Data contract schemas created (Pydantic models)
-- [ ] Unit tests for contracts written and passing
-- [ ] Data quality tests implemented
-- [ ] Test configuration (pytest.ini) created
-- [ ] All tests passing: `pytest tests/ -v`
-- [ ] Test coverage > 80%: `pytest --cov=backend`
-- [ ] Middleware for validation implemented
-- [ ] Data standards documented
-- [ ] Commit: `git add . && git commit -m "Add data contracts and quality tests"`
+- [x] Data contract schemas created (Pydantic models)
+- [x] Unit tests for contracts written and passing
+- [x] Data quality tests implemented
+- [x] Test configuration (pytest.ini) created
+- [x] All tests passing: `pytest tests/ -v`
+- [x] Test coverage > 80%: `pytest --cov=backend`
+- [x] Middleware for validation implemented
+- [x] Data standards documented
+- [x] Commit: `git add . && git commit -m "Add data contracts and quality tests"`
 
 ---
 
