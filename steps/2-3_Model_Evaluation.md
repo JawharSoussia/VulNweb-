@@ -223,15 +223,15 @@ ml_model/training/evaluation/
 
 ## ✅ Checklist
 
-- [ ] Evaluation script created
-- [ ] Metrics calculated: Precision, Recall, F1, ROC-AUC
-- [ ] Confusion matrix analyzed
-- [ ] ROC curve visualized
-- [ ] Classification report generated
-- [ ] Recall ≥ 90% verified
-- [ ] F1 ≥ 0.85 verified
-- [ ] Summary JSON created
-- [ ] Commit: `git add . && git commit -m "Add model evaluation metrics"`
+- [x] Evaluation script created
+- [x] Metrics calculated: Precision, Recall, F1, ROC-AUC
+- [x] Confusion matrix analyzed
+- [x] ROC curve visualized
+- [x] Classification report generated
+- [x] Recall ≥ 90% verified
+- [x] F1 ≥ 0.85 verified
+- [x] Summary JSON created
+- [x] Commit: `git add . && git commit -m "Add model evaluation metrics"`
 
 ---
 
