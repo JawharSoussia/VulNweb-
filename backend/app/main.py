@@ -30,16 +30,30 @@ async def lifespan(app: FastAPI):
 
     # Startup
     logger.info("Initializing VirusTotal client...")
-    vt_client = VirusTotalClient()
+    try:
+        vt_client = VirusTotalClient()
+        logger.info("VirusTotal client initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing VirusTotal client: {e}")
+        vt_client = None
 
     logger.info("Initializing UNSW-NB15 dataset loader...")
-    dataset_loader = UNSWDatasetLoader(data_dir="./data/unsw")
+    try:
+        # Use ./data directory which exists with train/val/test splits
+        dataset_loader = UNSWDatasetLoader(data_dir="./data")
+        logger.info("Dataset loader initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing dataset loader: {e}")
+        dataset_loader = None
 
     yield
 
     # Shutdown
     if vt_client:
-        vt_client.close()
+        try:
+            vt_client.close()
+        except Exception as e:
+            logger.error(f"Error closing VirusTotal client: {e}")
     logger.info("Application shutdown complete")
 
 app = FastAPI(
@@ -152,9 +166,8 @@ async def analyze_network_threat(request: NetworkThreatRequest):
 @app.get("/threats/dataset/info")
 async def get_dataset_info():
     """Get information about UNSW-NB15 dataset"""
-    if not dataset_loader:
-        raise HTTPException(status_code=503, detail="Dataset loader not available")
-
+    # Return static information about the dataset
+    # No need to actually load the data for this endpoint
     return {
         "dataset": "UNSW-NB15",
         "source": "https://www.kaggle.com/datasets/mrwellsdavid/unsw-nb15",
@@ -165,7 +178,8 @@ async def get_dataset_info():
         ],
         "total_samples": 2540047,
         "benign_samples": 2218761,
-        "attack_samples": 321276
+        "attack_samples": 321276,
+        "dataset_loader_available": dataset_loader is not None
     }
 
 @app.post("/threats/batch-analyze", response_model=BatchAnalysisResponse)
