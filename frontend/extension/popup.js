@@ -5,33 +5,6 @@ async function getCurrentTabUrl() {
   return tab?.url;
 }
 
-/**
- * Generate deterministic features based on URL
- * Same URL always produces same features (no randomness)
- */
-function generateDeterministicFeatures(url) {
-  // Use URL hash to seed feature generation
-  let hash = 0;
-  for (let i = 0; i < url.length; i++) {
-    const char = url.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-
-  // Convert to simple seeded random using hash
-  const seededRandom = (seed) => {
-    const x = Math.sin(seed) * 10000;
-    return x - Math.floor(x);
-  };
-
-  // Generate 34 features deterministically
-  const features = [];
-  for (let i = 0; i < 34; i++) {
-    features[i] = seededRandom(hash + i) * 10;
-  }
-
-  return features;
-}
 
 async function displayCurrentAnalysis() {
   const url = await getCurrentTabUrl();
@@ -44,11 +17,12 @@ async function displayCurrentAnalysis() {
   try {
     document.getElementById('current-analysis').innerHTML = '<div>Analyzing...</div>';
 
-    const cacheKey = `prediction_${url}`;
-    const cachedData = await chrome.storage.local.get([cacheKey]);
+    // Check unified storage pattern from background.js
+    const data = await chrome.storage.local.get(['predictions']);
+    const predictions = data.predictions || {};
 
-    if (cachedData[cacheKey]) {
-      const analysis = cachedData[cacheKey];
+    if (predictions[url]) {
+      const analysis = predictions[url];
       const confidence = analysis.confidence > 1 ? analysis.confidence : analysis.confidence * 100;
 
       document.getElementById('current-analysis').innerHTML = `
@@ -59,25 +33,12 @@ async function displayCurrentAnalysis() {
       return;
     }
 
-    const features = generateDeterministicFeatures(url);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    // Use background worker for prediction (handles caching, batching)
+    const analysis = await chrome.runtime.sendMessage({ type: 'CHECK_THREAT', data: { url } });
 
-    const response = await fetch(`${API_URL}/api/predict-raw`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+    if (analysis.error) {
+      throw new Error(analysis.error);
     }
-
-    const analysis = await response.json();
-    await chrome.storage.local.set({ [cacheKey]: analysis });
 
     const confidence = analysis.confidence > 1 ? analysis.confidence : analysis.confidence * 100;
 
@@ -98,10 +59,21 @@ async function displayStats() {
     const data = await chrome.storage.local.get(['predictions']);
     const predictions = data.predictions || {};
 
+    // Filter out invalid predictions safely
+    const validPredictions = Object.entries(predictions)
+      .filter(([url, pred]) => {
+        try {
+          return new URL(url) && pred && pred.threat_level;
+        } catch {
+          return false;
+        }
+      })
+      .map(([, pred]) => pred);
+
     const stats = {
-      total: Object.keys(predictions).length,
-      threats: Object.values(predictions).filter(p => p.threat_level !== 'safe').length,
-      critical: Object.values(predictions).filter(p => p.threat_level === 'critical').length
+      total: validPredictions.length,
+      threats: validPredictions.filter(p => p.threat_level !== 'safe').length,
+      critical: validPredictions.filter(p => p.threat_level === 'critical').length
     };
 
     document.getElementById('stat-total').textContent = stats.total;
@@ -121,6 +93,10 @@ function setupEventListeners() {
       await displayStats();
       alert('Cache cleared');
     }
+  });
+
+  document.getElementById('btn-dashboard').addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
   });
 
   document.getElementById('btn-settings').addEventListener('click', () => {

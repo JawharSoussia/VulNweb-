@@ -121,9 +121,10 @@ const requestBatcher = new RequestBatcher(
 );
 
 /**
- * Single prediction with timeout
+ * Single prediction with timeout and enhanced error handling
  */
-async function predictSingle(features) {
+async function predictSingle(features, retryCount = 0) {
+  const MAX_RETRIES = 2;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
@@ -135,18 +136,53 @@ async function predictSingle(features) {
       signal: controller.signal
     });
 
+    clearTimeout(timeout);
+
+    // Handle HTTP status codes
+    if (response.status === 429) {
+      // Rate limited - retry with backoff
+      if (retryCount < MAX_RETRIES) {
+        const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+        console.warn(`[VulNweb BG] Rate limited (429). Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return predictSingle(features, retryCount + 1);
+      }
+      throw new Error('API rate limited - too many requests');
+    }
+
+    if (response.status === 503) {
+      throw new Error('API service unavailable (model loading/error)');
+    }
+
+    if (response.status === 502 || response.status === 503 || response.status === 504) {
+      throw new Error('API server error - service temporarily unavailable');
+    }
+
     if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
+      const errorBody = await response.text();
+      throw new Error(`API returned ${response.status}: ${errorBody.substring(0, 100)}`);
     }
 
     return response.json();
+
   } catch (error) {
+    clearTimeout(timeout);
+
+    // Handle specific error types
     if (error.name === 'AbortError') {
       throw new Error('API request timed out after 5 seconds');
     }
+
+    if (error instanceof TypeError) {
+      // Network error (DNS resolution failed, connection refused, etc.)
+      if (error.message.includes('fetch')) {
+        throw new Error(`Network error: Cannot reach API at ${CONFIG.API_URL}. Is the backend running?`);
+      }
+      throw new Error(`Network error: ${error.message}`);
+    }
+
+    // Re-throw other errors
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -178,7 +214,14 @@ async function checkThreat(data, sender) {
     const features = data.features || generateFeatures(url);
 
     // Use batcher for efficiency
-    const prediction = await requestBatcher.add({ features });
+    let prediction;
+    try {
+      prediction = await requestBatcher.add({ features });
+    } catch (batchError) {
+      // If batching fails, try direct prediction with user feedback
+      console.warn('[VulNweb BG] Batch processing failed, attempting direct prediction:', batchError.message);
+      prediction = await predictSingle(features);
+    }
 
     // Cache result (use standardized cache key)
     predictionCache.set(cacheKey, {
@@ -189,12 +232,31 @@ async function checkThreat(data, sender) {
     // Persist to storage
     await saveToStorage(url, prediction);
 
+    // Send notification if enabled
+    await sendNotification(prediction, url);
+
     console.log('[VulNweb BG] Prediction:', url, prediction.threat_level);
     return prediction;
 
   } catch (error) {
     console.error('[VulNweb BG] Error:', error);
-    throw error;
+
+    // Return a safe default error response instead of throwing
+    // This prevents the content script from breaking
+    const errorResponse = {
+      threat_level: 'unknown',
+      threat_score: 0,
+      confidence: 0,
+      explanation: [error.message],
+      predicted_class: -1,
+      probabilities: {},
+      model_version: 'error',
+      request_id: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    };
+
+    throw errorResponse;
   }
 }
 
@@ -237,6 +299,56 @@ function generateFeatures(url = '') {
   }
 
   return features;
+}
+
+/**
+ * Send browser notification for threats
+ */
+async function sendNotification(prediction, url) {
+  try {
+    // Get notification settings from options
+    const settings = await chrome.storage.sync.get(['enableNotifications', 'notificationLevel']);
+
+    if (settings.enableNotifications === false) {
+      return; // Notifications disabled
+    }
+
+    // Determine if we should notify based on threat level
+    const notificationLevel = settings.notificationLevel || 'critical'; // 'safe', 'suspicious', 'critical'
+
+    const shouldNotify =
+      (notificationLevel === 'critical' && prediction.threat_level === 'critical') ||
+      (notificationLevel === 'suspicious' && ['suspicious', 'critical'].includes(prediction.threat_level)) ||
+      (notificationLevel === 'all' && prediction.threat_level !== 'safe');
+
+    if (!shouldNotify) {
+      return;
+    }
+
+    // Create notification
+    const notification = {
+      type: 'basic',
+      title: `🚨 VulNweb: ${prediction.threat_level.toUpperCase()} Threat Detected`,
+      message: `Threat Score: ${prediction.threat_score.toFixed(0)}%`,
+      iconUrl: '/icons/icon-128.png',
+      priority: prediction.threat_level === 'critical' ? 2 : 1,
+      silent: false
+    };
+
+    // Send notification
+    const notificationId = `vulnweb_${Date.now()}`;
+    chrome.notifications.create(notificationId, notification, (id) => {
+      console.log(`[VulNweb BG] Notification sent: ${id}`);
+    });
+
+    // Auto-clear notification after 10 seconds
+    setTimeout(() => {
+      chrome.notifications.clear(notificationId);
+    }, 10000);
+
+  } catch (error) {
+    console.warn('[VulNweb BG] Notification error:', error);
+  }
 }
 
 /**

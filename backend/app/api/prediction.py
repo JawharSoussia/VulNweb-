@@ -312,3 +312,127 @@ async def get_features(request: Request):
         "features": model_package.feature_names,
         "description": "These are the URL features extracted for ML prediction"
     }
+
+
+# ============================================================================
+# RAW FEATURE PREDICTION ENDPOINT (For Chrome Extension)
+# ============================================================================
+
+class RawPredictionRequest(BaseModel):
+    """Raw feature prediction request (bypasses feature extraction)"""
+    features: List[float] = Field(..., description="34 pre-extracted features")
+
+
+@router.post(
+    "/predict-raw",
+    response_model=PredictionResponse,
+    summary="Predict from raw features",
+    description="Make prediction from pre-extracted features (used by Chrome extension)"
+)
+async def predict_raw(request_data: RawPredictionRequest, request: Request) -> PredictionResponse:
+    """
+    Predict threat level from raw feature vector
+
+    This endpoint is used by the Chrome extension which pre-computes features.
+    It skips feature extraction and goes directly to model prediction.
+
+    **Parameters:**
+    - features: List of 34 float values (URL features)
+
+    **Returns:**
+    - Same as /api/predict endpoint
+    """
+
+    request_id = f"req_raw_{datetime.now().timestamp():.0f}"
+
+    try:
+        logger.info(f"[{request_id}] Raw feature prediction request")
+
+        # Get model
+        model_package = request.app.state.model_package
+        if model_package is None:
+            logger.error(f"[{request_id}] Model not loaded")
+            raise HTTPException(
+                status_code=503,
+                detail="Model not available - service temporarily unavailable"
+            )
+
+        # Validate feature vector
+        if len(request_data.features) != 34:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expected 34 features, got {len(request_data.features)}"
+            )
+
+        # Convert to numpy array
+        X = np.array(request_data.features).reshape(1, -1)
+
+        # Make prediction
+        prediction = model_package.predict(X)
+
+        threat_score = prediction['threat_score']
+        confidence = prediction['confidence']
+        threat_level = prediction['threat_level']
+        predicted_class = prediction['prediction']
+        probabilities = prediction['probabilities']
+
+        logger.info(
+            f"[{request_id}] Raw prediction: {threat_level} "
+            f"(score={threat_score:.1f}, class={predicted_class}, confidence={confidence:.3f})"
+        )
+
+        # Get explanations
+        explanation_list = []
+        try:
+            if model_package.explainer is not None:
+                explanations = model_package.explain(X, k=3)
+                if explanations and len(explanations) > 0:
+                    explanation_list = explanations[0]
+        except Exception as e:
+            logger.warning(f"[{request_id}] SHAP explanations unavailable: {e}")
+
+        # Fallback explanations
+        if not explanation_list:
+            if threat_level == "critical":
+                explanation_list = [
+                    "High threat indicators detected in URL features",
+                    "Suspicious pattern combination identified",
+                    "Domain characteristics suggest malicious intent"
+                ]
+            elif threat_level == "suspicious":
+                explanation_list = [
+                    "Several mild threat indicators detected",
+                    "Feature patterns show atypical characteristics",
+                    "Further investigation recommended"
+                ]
+            else:
+                explanation_list = [
+                    "URL features appear to be legitimate",
+                    "Normal feature distribution observed",
+                    "Low threat indicators detected"
+                ]
+
+        # Build response
+        response = PredictionResponse(
+            threat_score=threat_score,
+            threat_level=threat_level,
+            confidence=confidence,
+            predicted_class=predicted_class,
+            probabilities=probabilities,
+            explanation=explanation_list[:3],
+            model_version=model_package.metadata.get('model_name', 'XGBoost v1.0'),
+            request_id=request_id,
+            timestamp=datetime.utcnow().isoformat() + "Z"
+        )
+
+        logger.info(f"[{request_id}] Raw prediction response sent successfully")
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[{request_id}] Raw prediction error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Prediction failed"
+        )

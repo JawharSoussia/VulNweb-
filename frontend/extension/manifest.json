@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "VulNweb - Threat Detector",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Real-time threat detection powered by ML",
 
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "notifications"],
   "host_permissions": ["<all_urls>"],
 
   "content_scripts": [{
