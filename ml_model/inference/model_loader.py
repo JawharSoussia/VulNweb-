@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ModelPackage:
     """Manages model loading and versioning"""
 
-    def __init__(self, model_dir: str = "ml_model/inference/models"):
+    def __init__(self, model_dir: str = "ml_model/training/models"):
         """Initialize model package"""
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)
@@ -22,8 +22,9 @@ class ModelPackage:
         self.explainer = None
         self.metadata = None
         self.feature_names = None
+        self.num_classes = 3
 
-    def load_model(self, model_name: str = "xgboost_smote_model.pkl"):
+    def load_model(self, model_name: str = "XGBoost_model.pkl"):
         """Load trained model"""
         model_path = self.model_dir / model_name
 
@@ -89,30 +90,39 @@ class ModelPackage:
         return self.metadata
 
     def predict(self, X: np.ndarray) -> Dict[str, Any]:
-        """Make prediction"""
+        """Make prediction (multi-class)"""
         if self.model is None:
             raise ValueError("Model not loaded. Call load_model() first.")
 
         # Make prediction
-        pred = self.model.predict(X)
-        pred_proba = self.model.predict_proba(X)
+        pred = self.model.predict(X)  # Class prediction (0, 1, or 2)
+        pred_proba = self.model.predict_proba(X)  # Probabilities for each class
 
-        # Threat score 0-100
-        threat_score = float(pred_proba[0, 1] * 100)
+        # Map class to threat score and level
+        class_pred = int(pred[0])
 
-        # Threat level
-        if threat_score >= 70:
-            threat_level = "critical"
-        elif threat_score >= 30:
-            threat_level = "suspicious"
-        else:
-            threat_level = "safe"
+        # Get max probability for confidence
+        confidence = float(np.max(pred_proba[0]))
+
+        # Map class to threat levels
+        class_to_threat = {
+            0: ("safe", 15.0),           # Safe: low threat score
+            1: ("suspicious", 65.0),     # Threat Level 1: medium threat
+            2: ("critical", 85.0)        # Threat Level 2: high threat
+        }
+
+        threat_level, threat_score = class_to_threat.get(class_pred, ("unknown", 50.0))
 
         return {
-            'prediction': int(pred[0]),
+            'prediction': class_pred,
             'threat_score': threat_score,
-            'confidence': float(pred_proba[0, 1]),
-            'threat_level': threat_level
+            'confidence': confidence,
+            'threat_level': threat_level,
+            'probabilities': {
+                'safe': float(pred_proba[0, 0]),
+                'threat_level_1': float(pred_proba[0, 1]),
+                'threat_level_2': float(pred_proba[0, 2])
+            }
         }
 
     def explain(self, X: np.ndarray, k: int = 3) -> list:

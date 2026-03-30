@@ -1,14 +1,16 @@
-"""Threat Prediction Endpoint"""
+"""Threat Prediction Endpoint - URL-based"""
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from typing import List, Optional
 import numpy as np
 import logging
 from datetime import datetime
+from backend.app.feature_extractor import URLFeatureExtractor
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+feature_extractor = URLFeatureExtractor()
 
 
 # ============================================================================
@@ -16,65 +18,27 @@ router = APIRouter()
 # ============================================================================
 
 class PredictionRequest(BaseModel):
-    """Input schema for prediction request"""
+    """Input schema for URL threat prediction"""
 
-    url: str = Field(..., description="Target URL")
-    ip_address: str = Field(
-        ...,
-        pattern=r"^(\d{1,3}\.){3}\d{1,3}$",
-        description="IPv4 address"
-    )
-    port: Optional[int] = Field(None, ge=0, le=65535, description="Port number")
-    protocol: Optional[str] = Field(None, description="tcp or udp")
-    bytes_in: Optional[float] = Field(None, ge=0, description="Bytes received")
-    bytes_out: Optional[float] = Field(None, ge=0, description="Bytes sent")
-    duration: Optional[float] = Field(None, ge=0, description="Connection duration")
-    packets: Optional[int] = Field(None, ge=0, description="Number of packets")
-
-    @field_validator('url')
-    @classmethod
-    def validate_url(cls, v):
-        """Validate URL format"""
-        if not v.startswith(('http://', 'https://')):
-            raise ValueError('URL must start with http:// or https://')
-        return v
+    url: str = Field(..., description="Target URL to analyze", example="https://example.com/page")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "url": "https://example.com/page",
-                "ip_address": "192.168.1.1",
-                "port": 443,
-                "protocol": "tcp",
-                "bytes_in": 1024,
-                "bytes_out": 512,
-                "duration": 2.5,
-                "packets": 50
+                "url": "https://suspicious-site.com/download/?file=malware.exe"
             }
         }
-
-
-class ExplanationItem(BaseModel):
-    """Single explanation reason"""
-
-    reason: str = Field(..., description="Feature name and impact")
-    importance: float = Field(..., ge=0, description="Importance score")
 
 
 class PredictionResponse(BaseModel):
     """Output schema for prediction response"""
 
     threat_score: float = Field(..., ge=0, le=100, description="Threat score 0-100")
-    threat_level: str = Field(
-        ...,
-        description="Threat level: safe, suspicious, critical"
-    )
-    confidence: float = Field(..., ge=0, le=1, description="Confidence 0-1")
-    explanation: List[str] = Field(
-        ...,
-        max_length=3,
-        description="Top 3 reasons for prediction"
-    )
+    threat_level: str = Field(..., description="Threat level: safe, suspicious, critical")
+    confidence: float = Field(..., ge=0, le=1, description="Model confidence 0-1")
+    predicted_class: int = Field(..., description="0=Safe, 1=Threat Level 1, 2=Threat Level 2")
+    probabilities: dict = Field(..., description="Class probabilities")
+    explanation: List[str] = Field(..., max_length=3, description="Top 3 reasons for prediction")
     model_version: str = Field(..., description="Model version used")
     request_id: str = Field(..., description="Unique request identifier")
     timestamp: str = Field(..., description="Prediction timestamp")
@@ -82,17 +46,23 @@ class PredictionResponse(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "threat_score": 85.5,
+                "threat_score": 85.0,
                 "threat_level": "critical",
-                "confidence": 0.92,
+                "confidence": 0.95,
+                "predicted_class": 2,
+                "probabilities": {
+                    "safe": 0.02,
+                    "threat_level_1": 0.03,
+                    "threat_level_2": 0.95
+                },
                 "explanation": [
-                    "IP: Known malware C2 server",
-                    "Domain: Suspicious entropy 6.8",
-                    "Protocol: Unusual port 8883"
+                    "num_colons: 5 (highly suspicious)",
+                    "url_length: 92 (longer than average)",
+                    "special_char_ratio: 0.18 (elevated)"
                 ],
-                "model_version": "v1.0",
-                "request_id": "req_123abc",
-                "timestamp": "2026-03-17T12:34:56Z"
+                "model_version": "XGBoost v1.0",
+                "request_id": "req_1234567890",
+                "timestamp": "2026-03-30T14:30:00Z"
             }
         }
 
@@ -104,52 +74,37 @@ class PredictionResponse(BaseModel):
 @router.post(
     "/predict",
     response_model=PredictionResponse,
-    summary="Predict threat level",
-    description="Analyze URL/IP and predict threat level with explainability"
+    summary="Predict URL threat level",
+    description="Analyze URL and predict threat level using ML model"
 )
 async def predict(request_data: PredictionRequest, request: Request) -> PredictionResponse:
     """
-    Predict threat level for given URL/IP
+    Predict threat level for given URL
 
     **Parameters:**
     - url: Target URL to analyze
-    - ip_address: Source or target IP address
-    - port: Connection port (optional)
-    - protocol: tcp or udp (optional)
-    - bytes_in/out: Byte counts (optional)
-    - duration: Connection duration (optional)
-    - packets: Packet count (optional)
 
     **Returns:**
-    - threat_score: 0-100 scale
+    - threat_score: 0-100 threat rating
     - threat_level: safe/suspicious/critical
-    - confidence: 0-1 probability
-    - explanation: Top 3 decision reasons
+    - confidence: Model confidence (0-1)
+    - predicted_class: 0 (Safe), 1 (Threat Level 1), 2 (Threat Level 2)
+    - probabilities: Class probabilities
+    - explanation: Top 3 decision factors
     - model_version: Model used
     - request_id: Unique identifier
     - timestamp: Prediction time
-
-    **Example:**
-    ```
-    POST /api/predict
-    {
-      "url": "https://example.com",
-      "ip_address": "192.168.1.1",
-      "port": 443
-    }
-    ```
     """
 
     request_id = f"req_{datetime.now().timestamp():.0f}"
 
     try:
-        logger.info(f"[{request_id}] Prediction request: {request_data.url}")
+        logger.info(f"[{request_id}] URL prediction request: {request_data.url[:80]}")
 
         # ====================================================================
-        # 1. VALIDATE INPUT
+        # 1. GET MODEL
         # ====================================================================
 
-        # Model package from app state
         model_package = request.app.state.model_package
 
         if model_package is None:
@@ -160,74 +115,18 @@ async def predict(request_data: PredictionRequest, request: Request) -> Predicti
             )
 
         # ====================================================================
-        # 2. PREPARE FEATURES
+        # 2. EXTRACT FEATURES
         # ====================================================================
 
-        # Extract input values
-        url_length = len(request_data.url)
-        port = request_data.port or 443
-        bytes_in = request_data.bytes_in or 0
-        bytes_out = request_data.bytes_out or 0
-        duration = request_data.duration or 1.0
-        packets = request_data.packets or 1
-
-        # Derive additional network features from input data
-        # These simulate realistic UNSW-NB15 network flow characteristics
-        feature_dict = {}
-
-        # Basic flow features
-        feature_dict['dur'] = max(duration, 0.1)
-        feature_dict['sbytes'] = max(bytes_out, 0)
-        feature_dict['dbytes'] = max(bytes_in, 0)
-        feature_dict['spkts'] = max(packets, 1)
-        feature_dict['dpkts'] = max(packets // 2, 1)
-
-        # Derived metrics
-        feature_dict['swin'] = 65535
-        feature_dict['dwin'] = 65535
-        feature_dict['sload'] = (bytes_out / max(duration, 0.1)) if duration > 0 else 0
-        feature_dict['dload'] = (bytes_in / max(duration, 0.1)) if duration > 0 else 0
-        feature_dict['stcpb'] = 1 if request_data.protocol == "tcp" else 0
-        feature_dict['dtcpb'] = 1 if request_data.protocol == "tcp" else 0
-        feature_dict['smeansz'] = bytes_out / max(packets, 1)
-        feature_dict['dmeansz'] = bytes_in / max(packets // 2, 1)
-        feature_dict['response_body_len'] = bytes_in
-        feature_dict['sjit'] = 0.1
-        feature_dict['djit'] = 0.1
-        feature_dict['stime'] = 0
-        feature_dict['ltime'] = int(duration)
-        feature_dict['sintpkt'] = 0.01
-        feature_dict['dintpkt'] = 0.01
-        feature_dict['tcprtt'] = 0.05
-        feature_dict['synack'] = 0.02
-        feature_dict['ackdat'] = 0.03
-        feature_dict['is_sm_ips_ports'] = 0
-        feature_dict['ct_state_ttl'] = 64
-        feature_dict['ct_flw_http_mthd'] = 1 if port in [80, 443, 8080] else 0
-        feature_dict['is_ftp_login'] = 0
-        feature_dict['ct_ftp_cmd'] = 0
-        feature_dict['ct_srv_src'] = 1
-        feature_dict['ct_srv_dst'] = 1
-        feature_dict['ct_dst_ltm'] = 1
-        feature_dict['ct_src_ltm'] = 1
-        feature_dict['ct_src_dport_ltm'] = 1
-        feature_dict['ct_dst_sport_ltm'] = 1
-        feature_dict['ct_dst_src_ltm'] = 1
-        feature_dict['is_sb_flow'] = 0
-
-        # Add derived features for threat detection
-        # High bytes_out relative to bytes_in may indicate data exfiltration
-        feature_dict['bytes_ratio'] = (bytes_out / max(bytes_in, 1)) if bytes_in > 0 else 1.0
-        feature_dict['packet_ratio'] = (packets / max(packets // 2, 1)) if (packets // 2) > 0 else 1.0
-
-        # Create feature vector in correct order using model's expected feature names
-        X = np.array([
-            feature_dict.get(fname, 0)
-            for fname in model_package.feature_names
-        ]).reshape(1, -1)
-
-        logger.info(f"[{request_id}] Features prepared: {X.shape[1]} features")
-        logger.info(f"[{request_id}] Duration: {duration}s, Bytes: {bytes_out}→{bytes_in}, Packets: {packets}")
+        try:
+            X = feature_extractor.extract(request_data.url)
+            logger.info(f"[{request_id}] Features extracted: shape {X.shape}")
+        except Exception as e:
+            logger.error(f"[{request_id}] Feature extraction failed: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid URL for feature extraction: {str(e)}"
+            )
 
         # ====================================================================
         # 3. MAKE PREDICTION
@@ -238,105 +137,50 @@ async def predict(request_data: PredictionRequest, request: Request) -> Predicti
         threat_score = prediction['threat_score']
         confidence = prediction['confidence']
         threat_level = prediction['threat_level']
+        predicted_class = prediction['prediction']
+        probabilities = prediction['probabilities']
 
-        # ====================================================================
-        # HEURISTIC THREAT SCORING (enhance model with feature analysis)
-        # ====================================================================
-
-        # Calculate suspicious indicators from network flow
-        heuristic_score = 0.0
-        reasons = []
-
-        # 1. Data exfiltration indicators (high bytes_out relative to bytes_in)
-        bytes_ratio = feature_dict.get('bytes_ratio', 0)
-        if bytes_ratio > 3:  # Lowered from 10 to 5
-            heuristic_score += 50
-            reasons.append(f"Abnormal data flow: {bytes_ratio:.1f}x more outbound than inbound")
-        elif bytes_ratio > 2:
-            heuristic_score += 35
-            reasons.append("High outbound data ratio")
-
-        # 2. Large data transfer on unusual ports
-        sbytes = feature_dict.get('sbytes', 0)
-        port = request_data.port or 0
-        if sbytes > 100000 and port not in [80, 443, 8080]:  # Lowered from 1M to 100K
-            heuristic_score += 40
-            reasons.append(f"Large data transfer on non-standard port {port}")
-
-        # 3. High packet count in short duration (potential DDoS/scanning)
-        spkts = feature_dict.get('spkts', 0)
-        duration = feature_dict.get('dur', 1)
-        pps = spkts / max(duration, 0.1)  # packets per second
-        if pps > 500:  # Lowered from 1000 to 500
-            heuristic_score += 50
-            reasons.append(f"High packet rate ({pps:.0f} pps): Potential scanning or flooding")
-        elif pps > 250:
-            heuristic_score += 35
-            reasons.append(f"Elevated packet rate ({pps:.0f} pps)")
-
-        # 4. Suspicious protocol combinations
-        is_tcp = feature_dict.get('stcpb', 0)
-        is_http = feature_dict.get('ct_flw_http_mthd', 0)
-        if is_tcp and not is_http and port in [80, 443]:
-            heuristic_score += 25
-            reasons.append("Non-HTTP protocol on HTTP port (unusual)")
-
-        # 5. Multiple service connections from single source
-        ct_srv_src = feature_dict.get('ct_srv_src', 1)
-        if ct_srv_src > 50:
-            heuristic_score += 35
-            reasons.append(f"Multiple services from single source ({ct_srv_src} connections)")
-
-        # 6. Very long connections might indicate command & control
-        duration_hours = duration / 3600
-        if duration_hours > 0.5:  # Long-lived connection (>30 mins)
-            heuristic_score += 50
-            reasons.append(f"Prolonged connection ({duration_hours:.1f}hrs): Potential C2 or persistence")
-        elif duration_hours > 0.1:
-            heuristic_score += 25
-            reasons.append(f"Elevated connection duration ({duration_hours*60:.0f} minutes)")
-
-        # Combine model prediction with heuristic scoring
-        # Give 40% weight to model, 60% to heuristics (heuristics more important for real detections)
-        combined_score = (threat_score * 0.4) + (heuristic_score * 0.6)
-
-        # Ensure score stays in valid range
-        combined_score = min(max(combined_score, 0), 100)
-
-        # Update threat level based on combined score
-        if combined_score >= 70:
-            threat_level = "critical"
-        elif combined_score >= 30:
-            threat_level = "suspicious"
-        else:
-            threat_level = "safe"
-
-        # Add heuristic analysis to explanation
-        if not reasons:
-            reasons = ["Normal network behavior"]
-
-        logger.info(f"[{request_id}] Model score: {threat_score:.2f}, Heuristic: {heuristic_score:.2f}, Combined: {combined_score:.2f}")
-        logger.info(f"[{request_id}] Threat indicators: {reasons[:3]}")
-
-        # Update threat_score with combined score
-        threat_score = combined_score
+        logger.info(
+            f"[{request_id}] Prediction: {threat_level} "
+            f"(score={threat_score:.1f}, class={predicted_class}, confidence={confidence:.3f})"
+        )
 
         # ====================================================================
         # 4. GET EXPLANATIONS
         # ====================================================================
 
-        explanation_list = reasons[:3]  # Use heuristic reasons
+        explanation_list = []
         try:
-            # Try to get additional model explanations
-            explanations = model_package.explain(X, k=2)
-            if explanations:
-                model_reasons = explanations[0]
-                # Combine heuristic + model explanations
-                explanation_list = reasons[:2] + model_reasons[:1]
+            # Get SHAP explanations if available
+            if model_package.explainer is not None:
+                explanations = model_package.explain(X, k=3)
+                if explanations and len(explanations) > 0:
+                    explanation_list = explanations[0]
         except Exception as e:
-            logger.warning(f"[{request_id}] Could not generate model explanations: {e}")
+            logger.warning(f"[{request_id}] SHAP explanations unavailable: {e}")
 
-        logger.info(f"[{request_id}] Explanation: {explanation_list}")
+        # Fallback explanations based on threat level
+        if not explanation_list:
+            if threat_level == "critical":
+                explanation_list = [
+                    "High threat indicators detected in URL structure",
+                    "Suspicious character patterns identified",
+                    "Domain characteristics suggest malicious intent"
+                ]
+            elif threat_level == "suspicious":
+                explanation_list = [
+                    "Several mild threat indicators detected",
+                    "URL structure shows atypical patterns",
+                    "Further investigation recommended"
+                ]
+            else:
+                explanation_list = [
+                    "URL appears to be legitimate",
+                    "Normal domain structure observed",
+                    "Low threat indicators detected"
+                ]
+
+        logger.info(f"[{request_id}] Explanations: {explanation_list}")
 
         # ====================================================================
         # 5. BUILD RESPONSE
@@ -346,33 +190,15 @@ async def predict(request_data: PredictionRequest, request: Request) -> Predicti
             threat_score=threat_score,
             threat_level=threat_level,
             confidence=confidence,
-            explanation=explanation_list if explanation_list else [
-                "Analysis complete",
-                "Check threat score for details",
-                "Request logged for monitoring"
-            ],
-            model_version=model_package.metadata.get('model_name', 'v1.0'),
+            predicted_class=predicted_class,
+            probabilities=probabilities,
+            explanation=explanation_list[:3],
+            model_version=model_package.metadata.get('model_name', 'XGBoost v1.0'),
             request_id=request_id,
             timestamp=datetime.utcnow().isoformat() + "Z"
         )
 
         logger.info(f"[{request_id}] Response sent successfully")
-
-        # ====================================================================
-        # 6. LOG PREDICTION (for feedback loop & monitoring)
-        # ====================================================================
-
-        # TODO: Store in database (Task 3.5)
-        log_entry = {
-            'request_id': request_id,
-            'url': request_data.url,
-            'ip_address': request_data.ip_address,
-            'threat_score': threat_score,
-            'threat_level': threat_level,
-            'timestamp': datetime.utcnow().isoformat()
-        }
-        logger.info(f"[{request_id}] Logged: {log_entry}")
-
         return response
 
     except HTTPException:
@@ -386,67 +212,60 @@ async def predict(request_data: PredictionRequest, request: Request) -> Predicti
 
 
 # ============================================================================
-# BATCH PREDICTION ENDPOINT (Optional)
+# BATCH PREDICTION ENDPOINT
 # ============================================================================
 
 class BatchPredictionRequest(BaseModel):
-    """Batch prediction requests"""
-
-    requests: List[PredictionRequest] = Field(
-        ...,
-        max_length=100,
-        description="Up to 100 prediction requests"
-    )
+    """Batch prediction request"""
+    urls: List[str] = Field(..., max_length=100, description="Up to 100 URLs")
 
 
 class BatchPredictionResponse(BaseModel):
     """Batch predictions response"""
-
     results: List[PredictionResponse]
     batch_id: str
     total: int
-    success: int
+    successful: int
     failed: int
 
 
 @router.post(
     "/predict-batch",
     response_model=BatchPredictionResponse,
-    summary="Batch threat predictions"
+    summary="Batch URL threat predictions"
 )
-async def predict_batch(batch_request: BatchPredictionRequest, request: Request) -> \
-        BatchPredictionResponse:
+async def predict_batch(batch_request: BatchPredictionRequest, request: Request) -> BatchPredictionResponse:
     """
-    Predict threats for multiple URLs/IPs in single request
+    Predict threats for multiple URLs
 
     **Parameters:**
-    - requests: List of prediction requests (max 100)
+    - urls: List of up to 100 URLs to analyze
 
     **Returns:**
     - Batch ID for tracking
-    - Individual predictions for each request
-    - Success/failure counts
+    - Individual predictions for each URL
+    - Success/failure statistics
     """
 
     batch_id = f"batch_{datetime.now().timestamp():.0f}"
     results = []
     failed = 0
 
-    logger.info(f"[{batch_id}] Batch prediction: {len(batch_request.requests)} items")
+    logger.info(f"[{batch_id}] Batch prediction: {len(batch_request.urls)} URLs")
 
-    for idx, pred_req in enumerate(batch_request.requests):
+    for idx, url in enumerate(batch_request.urls):
         try:
-            response = await predict(pred_req, request)
-            results.append(response)
+            pred_response = await predict(PredictionRequest(url=url), request)
+            results.append(pred_response)
         except Exception as e:
-            logger.error(f"[{batch_id}] Item {idx} failed: {e}")
+            logger.error(f"[{batch_id}] URL {idx} failed: {e}")
             failed += 1
 
     return BatchPredictionResponse(
         results=results,
         batch_id=batch_id,
-        total=len(batch_request.requests),
-        success=len(results),
+        total=len(batch_request.urls),
+        successful=len(results),
         failed=failed
     )
 
@@ -456,12 +275,32 @@ async def predict_batch(batch_request: BatchPredictionRequest, request: Request)
 # ============================================================================
 
 @router.get(
-    "/features",
-    summary="Get expected features",
-    description="Returns list of feature names expected by the model"
+    "/model-info",
+    summary="Get model information",
+    description="Returns metadata about loaded ML model"
 )
+async def get_model_info(request: Request):
+    """Get model metadata and capabilities"""
+
+    model_package = request.app.state.model_package
+
+    if model_package is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    return {
+        "model_name": model_package.metadata.get('model_name', 'Unknown'),
+        "model_version": model_package.metadata.get('trained_at', 'Unknown'),
+        "num_classes": model_package.num_classes,
+        "class_names": ["Safe", "Threat Level 1", "Threat Level 2"],
+        "num_features": len(model_package.feature_names),
+        "feature_names": model_package.feature_names,
+        "performance": model_package.metadata.get('cv_results', {})
+    }
+
+
+@router.get("/features")
 async def get_features(request: Request):
-    """Get list of features the model expects"""
+    """Get list of features expected by the model"""
 
     model_package = request.app.state.model_package
 
@@ -471,127 +310,5 @@ async def get_features(request: Request):
     return {
         "feature_count": len(model_package.feature_names),
         "features": model_package.feature_names,
-        "description": "Use these feature names when sending predictions"
+        "description": "These are the URL features extracted for ML prediction"
     }
-
-
-# ============================================================================
-# RAW FEATURES ENDPOINT (Direct UNSW-NB15 features)
-# ============================================================================
-
-class RawPredictionRequest(BaseModel):
-    """Raw feature vector input (34 UNSW-NB15 features)"""
-
-    features: List[float] = Field(
-        ...,
-        min_length=34,
-        max_length=34,
-        description="34 network flow features from UNSW-NB15 dataset"
-    )
-
-
-@router.post(
-    "/predict-raw",
-    response_model=PredictionResponse,
-    summary="Predict from raw features",
-    description="Direct prediction using 34 UNSW-NB15 network features"
-)
-async def predict_raw(raw_request: RawPredictionRequest, request: Request) -> PredictionResponse:
-    """
-    Make prediction using raw UNSW-NB15 features directly
-
-    **Parameters:**
-    - features: List of exactly 34 network flow feature values
-
-    **Feature order:**
-    ```
-    0: dintpkt, 1: sport, 2: sttl, 3: dloss, 4: ct_srv_src,
-    5: ct_srv_dst, 6: ct_dst_ltm, 7: ct_src_ltm, 8: ct_dst_sport,
-    9: ct_dst_src_ltm, 10: ct_flw_http_mthd, 11: is_ftp_login,
-    12: ct_ftp_cmd, 13: ct_srv_admin, 14: ct_srv_http, 15: ct_src_dport_ltm,
-    16: ct_proto_udp, 17: ct_proto_tcp, 18: ct_proto_icmp, 19: dmeansz,
-    20: djit, 21: drate, 22: dminsz, 23: dpkt, 24: dscore,
-    25: dtwin, 26: dttl, 27: dur, 28: rate, 29: res_bdy_len,
-    30: res_del_time, 31: response_body_len, 32: service_response_time,
-    33: smeansz
-    ```
-
-    **Returns:**
-    - threat_score: 0-100 scale (higher = more threatening)
-    - threat_level: "safe" (0-30) / "suspicious" (30-70) / "critical" (70-100)
-    - confidence: Model confidence (0-1)
-    - explanation: Top 3 decision factors
-    - model_version: Model name
-    - request_id: Unique request ID
-    - timestamp: Prediction time
-
-    **Example:**
-    ```
-    POST /api/predict-raw
-    {
-      "features": [1.0, 443, 64, 0, 2, 1, 5, 10, 2, 15, 0, 0,
-                   0, 0, 0, 0, 0, 1, 0, 100, 0.5, 0.2, 20, 50,
-                   0, 64, 100, 2.5, 0.8, 1024, 0.1, 2048, 1.5, 256]
-    }
-    ```
-    """
-
-    request_id = f"req_{datetime.now().timestamp():.0f}"
-
-    try:
-        logger.info(f"[{request_id}] Raw prediction request with {len(raw_request.features)} features")
-
-        model_package = request.app.state.model_package
-
-        if model_package is None:
-            logger.error(f"[{request_id}] Model not loaded")
-            raise HTTPException(
-                status_code=503,
-                detail="Model not available"
-            )
-
-        # Convert features to numpy array
-        X = np.array(raw_request.features).reshape(1, -1)
-
-        logger.info(f"[{request_id}] Features shape: {X.shape}")
-
-        # Make prediction
-        prediction = model_package.predict(X)
-
-        threat_score = prediction['threat_score']
-        confidence = prediction['confidence']
-        threat_level = prediction['threat_level']
-
-        logger.info(f"[{request_id}] Prediction: {threat_level} (score={threat_score:.1f}%)")
-
-        # Get explanations
-        explanation_list = []
-        try:
-            explanations = model_package.explain(X, k=3)
-            if explanations:
-                explanation_list = explanations[0]
-        except Exception as e:
-            logger.warning(f"[{request_id}] Explanations unavailable: {e}")
-
-        response = PredictionResponse(
-            threat_score=threat_score,
-            threat_level=threat_level,
-            confidence=confidence,
-            explanation=explanation_list if explanation_list else [
-                "Network analysis complete",
-                "Check threat score for details",
-                "Request ID: " + request_id
-            ],
-            model_version=model_package.metadata.get('model_name', 'v1.0'),
-            request_id=request_id,
-            timestamp=datetime.utcnow().isoformat() + "Z"
-        )
-
-        logger.info(f"[{request_id}] Response sent")
-        return response
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[{request_id}] Raw prediction error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Prediction failed")
