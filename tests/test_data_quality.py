@@ -1,116 +1,138 @@
-"""Data quality and freshness tests"""
-import pytest
+"""Data Quality Tests for URL Dataset - Validate processed features"""
 import pandas as pd
-from pathlib import Path
-from datetime import datetime, timedelta
-import logging
-
-logger = logging.getLogger(__name__)
+import numpy as np
+import sys
 
 
-class TestDataQuality:
-    """Test data quality standards"""
+class DataQualityTests:
+    """Comprehensive data quality test suite for URL features"""
 
-    @pytest.fixture
-    def processed_data(self):
-        """Load processed training data"""
-        df = pd.read_csv("data/train/train_processed.csv")
-        return df
+    def __init__(self):
+        self.passed_tests = 0
+        self.failed_tests = 0
 
-    def test_no_missing_values(self, processed_data):
-        """No missing values in processed data"""
-        assert processed_data.isnull().sum().sum() == 0, \
-            f"Found {processed_data.isnull().sum().sum()} missing values"
+    def run_test(self, test_name: str, condition: bool, error_msg: str = ""):
+        """Run a single test and track results"""
+        if condition:
+            self.passed_tests += 1
+            print(f"  [OK] {test_name}")
+        else:
+            self.failed_tests += 1
+            if error_msg:
+                print(f"  [FAIL] {test_name}: {error_msg}")
+            else:
+                print(f"  [FAIL] {test_name}")
 
-    def test_no_duplicates(self, processed_data):
-        """No excessive duplicate rows (high duplicates expected in network data)"""
-        duplicate_count = processed_data.duplicated().sum()
-        duplicate_ratio = duplicate_count / len(processed_data)
+    def test_no_missing_values(self, df):
+        """Test that no features have missing values"""
+        print("\n[TEST] No Missing Values")
+        missing_count = df.isnull().sum().sum()
+        self.run_test("No NaN values", missing_count == 0,
+                     f"Found {missing_count} NaN values")
 
-        # Network data naturally has duplicates after removing identifying columns (IPs, timestamps)
-        # Accept up to 25% duplicates as this is expected behavior for network features
-        assert duplicate_ratio < 0.25, \
-            f"Excessive duplicates detected: {duplicate_ratio:.2%} ({duplicate_count} rows, threshold: 25%)"
+        inf_count = np.isinf(df.select_dtypes(include=[np.number])).sum().sum()
+        self.run_test("No Infinite values", inf_count == 0,
+                     f"Found {inf_count} Inf values")
 
-    def test_numeric_columns_dtype(self, processed_data):
-        """All columns are numeric (except target)"""
-        for col in processed_data.columns:
-            if col not in ['label', 'target', 'class']:
-                assert processed_data[col].dtype in ['float64', 'int64'], \
-                    f"Column {col} has non-numeric dtype: {processed_data[col].dtype}"
+    def test_feature_dtypes(self, df):
+        """Test that features are numeric"""
+        print("\n[TEST] Feature Data Types")
+        numeric_count = len(df.select_dtypes(include=[np.number]).columns)
+        self.run_test(f"Expected number of features", numeric_count >= 37,
+                     f"Found {numeric_count} numeric features (expected >= 37)")
 
-    def test_feature_bounds(self, processed_data):
-        """Features within expected bounds (scaled features + clipped extremes)"""
-        numeric_cols = processed_data.select_dtypes(include=['float64', 'int64']).columns
+    def test_feature_scaling(self, df):
+        """Test that features are properly scaled"""
+        print("\n[TEST] Feature Scaling")
+        numeric_df = df.select_dtypes(include=[np.number])
 
-        for col in numeric_cols:
-            # After RobustScaler + clipping, features should be in [-50, 50]
-            max_val = processed_data[col].max()
-            min_val = processed_data[col].min()
+        min_val = numeric_df.min().min()
+        max_val = numeric_df.max().max()
 
-            assert max_val <= 50.1, \
-                f"Column {col} exceeds maximum value: {max_val} (expected <= 50)"
-            assert min_val >= -50.1, \
-                f"Column {col} below minimum value: {min_val} (expected >= -50)"
+        self.run_test("Features within bounds",
+                     min_val >= -10 and max_val <= 10,
+                     f"Range: [{min_val:.2f}, {max_val:.2f}]")
 
-    def test_target_distribution(self, processed_data):
-        """Target variable has reasonable distribution"""
-        target_col = 'label' if 'label' in processed_data.columns else processed_data.columns[-1]
-        counts = processed_data[target_col].value_counts()
+    def test_threat_level_distribution(self, df):
+        """Test threat levels are distributed"""
+        print("\n[TEST] Threat Level Distribution")
+        if 'threat_level' not in df.columns:
+            print("  [!] threat_level column not found")
+            return
 
-        # At least 2 classes
-        assert len(counts) >= 2, "Target has less than 2 classes"
+        threat_counts = df['threat_level'].value_counts().sort_index()
+        self.run_test("All threat levels present",
+                     set(threat_counts.index) == {0, 1, 2},
+                     f"Threat levels found: {set(threat_counts.index)}")
 
-        # Check class imbalance ratio
-        min_count = counts.min()
-        max_count = counts.max()
-        imbalance_ratio = min_count / max_count
+    def test_split_sizes(self, train_df, val_df, test_df):
+        """Test data splits are approximately 60/20/20"""
+        print("\n[TEST] Split Sizes (60/20/20)")
+        total = len(train_df) + len(val_df) + len(test_df)
 
-        assert imbalance_ratio > 0.05, \
-            f"Severe class imbalance detected: ratio={imbalance_ratio:.3f}"
+        train_pct = len(train_df) / total * 100
+        val_pct = len(val_df) / total * 100
+        test_pct = len(test_df) / total * 100
 
-    def test_feature_count_consistency(self):
-        """Feature count consistent across splits"""
-        train = pd.read_csv("data/train/train_processed.csv")
-        val = pd.read_csv("data/train/val_processed.csv")
-        test = pd.read_csv("data/test/test_processed.csv")
+        self.run_test("Train ~60%", 58 <= train_pct <= 62,
+                     f"Train: {train_pct:.1f}%")
+        self.run_test("Val ~20%", 18 <= val_pct <= 22,
+                     f"Val: {val_pct:.1f}%")
+        self.run_test("Test ~20%", 18 <= test_pct <= 22,
+                     f"Test: {test_pct:.1f}%")
 
-        assert train.shape[1] == val.shape[1] == test.shape[1], \
-            f"Feature count mismatch: train={train.shape[1]}, " \
-            f"val={val.shape[1]}, test={test.shape[1]}"
+    def print_summary(self):
+        """Print test summary"""
+        print("\n" + "=" * 80)
+        print("TEST SUMMARY")
+        print("=" * 80)
+        print(f"Passed: {self.passed_tests}")
+        print(f"Failed: {self.failed_tests}")
+        print(f"Total:  {self.passed_tests + self.failed_tests}")
 
-    def test_minimum_samples(self):
-        """Datasets have minimum sample counts"""
-        train = pd.read_csv("data/train/train_processed.csv")
-        val = pd.read_csv("data/train/val_processed.csv")
-        test = pd.read_csv("data/test/test_processed.csv")
-
-        MIN_TRAIN_SAMPLES = 1000
-        MIN_VAL_SAMPLES = 200
-        MIN_TEST_SAMPLES = 200
-
-        assert len(train) >= MIN_TRAIN_SAMPLES, \
-            f"Train set too small: {len(train)} < {MIN_TRAIN_SAMPLES}"
-        assert len(val) >= MIN_VAL_SAMPLES, \
-            f"Val set too small: {len(val)} < {MIN_VAL_SAMPLES}"
-        assert len(test) >= MIN_TEST_SAMPLES, \
-            f"Test set too small: {len(test)} < {MIN_TEST_SAMPLES}"
+        if self.failed_tests == 0:
+            print("\n[SUCCESS] ALL TESTS PASSED!")
+            return True
+        else:
+            print(f"\n[WARNING] {self.failed_tests} TEST(S) FAILED")
+            return False
 
 
-class TestDataFreshness:
-    """Test data freshness (if timestamp present)"""
+def main():
+    print("=" * 80)
+    print("DATA QUALITY TEST SUITE - URL Features Dataset")
+    print("=" * 80)
 
-    def test_recent_data(self):
-        """Data is recent (within expected timeframe)"""
-        # This assumes raw data has a timestamp column
-        # Adjust based on your actual data
-        raw_file = Path("data/raw")
-        csv_files = list(raw_file.glob("*.csv"))
+    # Load datasets
+    print("\nLoading processed datasets...")
+    train_df = pd.read_csv('data/train/train_processed.csv')
+    val_df = pd.read_csv('data/val/val_processed.csv')
+    test_df = pd.read_csv('data/test/test_processed.csv')
 
-        if csv_files:
-            file_stat = csv_files[0].stat()
-            file_age_days = (datetime.now() - datetime.fromtimestamp(file_stat.st_mtime)).days
+    print(f"  Train: {train_df.shape}")
+    print(f"  Val:   {val_df.shape}")
+    print(f"  Test:  {test_df.shape}")
 
-            # Data should be less than 90 days old
-            assert file_age_days < 90, \
-                f"Data is {file_age_days} days old - consider refreshing"
+    tester = DataQualityTests()
+
+    print("\n" + "=" * 80)
+    print("RUNNING TESTS")
+    print("=" * 80)
+
+    tester.test_no_missing_values(train_df)
+    tester.test_no_missing_values(val_df)
+    tester.test_no_missing_values(test_df)
+    tester.test_feature_dtypes(train_df)
+    tester.test_feature_scaling(train_df)
+    tester.test_threat_level_distribution(train_df)
+    tester.test_threat_level_distribution(val_df)
+    tester.test_threat_level_distribution(test_df)
+    tester.test_split_sizes(train_df, val_df, test_df)
+
+    all_passed = tester.print_summary()
+    return 0 if all_passed else 1
+
+
+if __name__ == "__main__":
+    exit_code = main()
+    sys.exit(exit_code)

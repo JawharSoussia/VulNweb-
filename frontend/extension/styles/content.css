@@ -1,0 +1,85 @@
+/* VulNweb Content Script Styles - Light Theme */
+
+.vulnweb-threat-indicator {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-left: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 8px currentColor;
+  animation: vulnweb-pulse 2s infinite;
+  transition: transform 0.2s ease;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+}
+
+.vulnweb-threat-indicator:hover {
+  transform: scale(1.4);
+  box-shadow: 0 0 15px currentColor;
+}
+
+@keyframes vulnweb-pulse {
+  0% {
+    box-shadow: 0 0 8px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 16px currentColor;
+  }
+  100% {
+    box-shadow: 0 0 8px currentColor;
+  }
+}
+
+.vulnweb-popup {
+  position: fixed;
+  z-index: 10000;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%);
+  border: 1.5px solid #7b68ee;
+  border-radius: 10px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 10px 40px rgba(123, 104, 238, 0.15), 0 0 20px rgba(123, 104, 238, 0.08);
+  color: #333333;
+}
+
+.vulnweb-popup-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #7b68ee;
+  text-shadow: none;
+  font-size: 14px;
+}
+
+.vulnweb-threat-safe {
+  color: #4caf50;
+  text-shadow: none;
+}
+
+.vulnweb-threat-suspicious {
+  color: #ffc107;
+  text-shadow: none;
+}
+
+.vulnweb-threat-critical {
+  color: #f44336;
+  text-shadow: none;
+}
+
+/* Popup content styling */
+.vulnweb-popup > div {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #f9f9f9 0%, #f5f5f5 100%);
+}
+
+.vulnweb-popup strong {
+  color: #7b68ee;
+}
+
+.vulnweb-popup > div > div {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.vulnweb-popup > div > div:last-child {
+  margin-bottom: 0;
+}

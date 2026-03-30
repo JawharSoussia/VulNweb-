@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <h1>VulNweb</h1>
+    <p>Threat Detection</p>
+  </div>
+
+  <div class="content">
+    <!-- Current Page Analysis -->
+    <div class="section">
+      <div class="section-title">Current Analysis</div>
+      <div id="current-analysis">
+        <div style="text-align: center; color: #7b68ee;">Loading threat analysis...</div>
+      </div>
+    </div>
+
+    <!-- Statistics Grid -->
+    <div class="section">
+      <div class="section-title">Statistics</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Pages</span>
+          <span class="stat-value" id="stat-total">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Threats</span>
+          <span class="stat-value">
+            <span class="threat-indicator threat-suspicious"></span>
+            <span id="stat-threats">0</span>
+          </span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Critical</span>
+          <span class="stat-value">
+            <span class="threat-indicator threat-critical"></span>
+            <span id="stat-critical">0</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="section">
+      <div class="section-title">Actions</div>
+      <div class="button-group">
+        <button class="button" id="btn-clear">Clear Cache</button>
+        <button class="button secondary" id="btn-settings">Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

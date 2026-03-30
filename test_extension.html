@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VulNweb Extension Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+            font-size: 1.5em;
+        }
+
+        .link-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .link-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .link-card:hover {
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+        }
+
+        .link-card a {
+            display: block;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+
+        .link-card a:hover {
+            text-decoration: underline;
+        }
+
+        .link-card .description {
+            font-size: 0.9em;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .threat-level {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .level-safe {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .level-suspicious {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .level-critical {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .instructions {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .instructions h3 {
+            color: #004085;
+            margin-bottom: 10px;
+        }
+
+        .instructions li {
+            margin-left: 20px;
+            color: #004085;
+            line-height: 1.6;
+        }
+
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+        }
+
+        footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ VulNweb Extension Test Laboratory</h1>
+            <p>Click links below to test threat detection</p>
+        </header>
+
+        <div class="content">
+            <!-- Instructions -->
+            <div class="instructions">
+                <h3>📋 How to Test:</h3>
+                <ol>
+                    <li>Make sure the VulNweb extension is <strong>loaded</strong> in Chrome</li>
+                    <li>Backend API should be <strong>running</strong> on localhost:8000</li>
+                    <li><strong>Click any link below</strong> to test threat analysis</li>
+                    <li>Check the <strong>extension popup</strong> to see threat scores</li>
+                    <li>Open DevTools (F12) → <strong>Console</strong> to see detailed logs</li>
+                </ol>
+            </div>
+
+            <!-- Safe Sites -->
+            <div class="section">
+                <h2>✅ Safe Websites (Low Threat)</h2>
+                <div class="link-group">
+                    <div class="link-card">
+                        <a href="https://www.google.com" target="_blank">Google</a>
+                        <span class="description">World's largest search engine</span>
+                        <span class="threat-level level-safe">Safe</span>
+                    </div>
+                    <div class="link-card">
+                        <a href="https://www.wikipedia.org" target="_blank">Wikipedia</a>
+                        <span class="description">Free online encyclopedia</span>
+                        <span class="threat-level level-safe">Safe</span>
+                    </div>
+                    <div class="link-card">
+                        <a href="https://www.github.com" target="_blank">GitHub</a>
+                        <span class="description">Code repository platform</span>
+                        <span class="threat-level level-safe">Safe</span>
+                    </div>
+                    <div class="link-card">
+                        <a href="https://www.stackoverflow.com" target="_blank">Stack Overflow</a>
+                        <span class="description">Programming Q&A platform</span>
+                        <span class="threat-level level-safe">Safe</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suspicious Sites -->
+            <div class="section">
+                <h2>⚠️ Suspicious URLs (Medium/High Threat)</h2>
+                <div class="link-group">
+                    <div class="link-card">
+                        <a href="https://www.eicar.org/download/eicar.com.txt" target="_blank">EICAR Test File</a>
+                        <span class="description">Harmless test file used by antivirus</span>
+                        <span class="threat-level level-suspicious">Suspicious</span>
+                    </div>
+                    <div class="link-card">
+                        <a href="https://www.malware-test.com" target="_blank">Malware Test (Disabled)</a>
+                        <span class="description">Educational malware detection</span>
+                        <span class="threat-level level-suspicious">Suspicious</span>
+                    </div>
+                    <div class="link-card">
+                        <a href="javascript:void(0)" onclick="alert('This is a test XSS vector')" target="_blank">XSS Test Vector</a>
+                        <span class="description">Tests extension XSS detection</span>
+                        <span class="threat-level level-critical">Critical</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Forms -->
+            <div class="section">
+                <h2>📝 Form Testing</h2>
+                <div class="instructions">
+                    <p>Forms help test dynamic content extraction:</p>
+                </div>
+                <form style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Test Input Field:</label>
+                        <input type="text" placeholder="Type something..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Test Link Input:</label>
+                        <input type="url" placeholder="https://example.com" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <button type="submit" style="background: #667eea; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Submit</button>
+                </form>
+            </div>
+
+            <!-- API Testing Commands -->
+            <div class="section">
+                <h2>🔧 Direct API Testing</h2>
+                <p style="margin-bottom: 15px; color: #666;">Run these commands in your terminal to test the backend directly:</p>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; overflow-x: auto;">
+                    <strong>1. Test Health Endpoint:</strong>
+                    <code style="display: block; margin-top: 8px; color: #333; font-family: monospace;">curl http://localhost:8000/health</code>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; overflow-x: auto;">
+                    <strong>2. Test Network Analysis:</strong>
+                    <code style="display: block; margin-top: 8px; color: #333; font-family: monospace;">python test_extension.py</code>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; overflow-x: auto;">
+                    <strong>3. View API Documentation:</strong>
+                    <code style="display: block; margin-top: 8px; color: #333; font-family: monospace;">http://localhost:8000/docs</code>
+                </div>
+            </div>
+
+            <!-- Testing Checklist -->
+            <div class="section">
+                <h2>✓ Testing Checklist</h2>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <label style="display: block; margin-bottom: 12px;">
+                        <input type="checkbox"> Extension icon appears in toolbar
+                    </label>
+                    <label style="display: block; margin-bottom: 12px;">
+                        <input type="checkbox"> Popup opens when clicking extension icon
+                    </label>
+                    <label style="display: block; margin-bottom: 12px;">
+                        <input type="checkbox"> Settings page loads correctly
+                    </label>
+                    <label style="display: block; margin-bottom: 12px;">
+                        <input type="checkbox"> API connection test succeeds
+                    </label>
+                    <label style="display: block; margin-bottom: 12px;">
+                        <input type="checkbox"> URL threat scores display in popup
+                    </label>
+                    <label style="display: block; margin-bottom: 12px;">
+                        <input type="checkbox"> Different threat levels show different colors
+                    </label>
+                    <label style="display: block; margin-bottom: 12px;">
+                        <input type="checkbox"> Feedback submission works
+                    </label>
+                    <label style="display: block; margin-bottom: 12px;">
+                        <input type="checkbox"> Cache is working (repeated URLs are faster)
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>VulNweb Extension Test Laboratory • Built for safe threat detection testing</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">💡 Tip: Keep DevTools open (F12) to see extension logs and debug any issues</p>
+        </footer>
+    </div>
+</body>
+</html>

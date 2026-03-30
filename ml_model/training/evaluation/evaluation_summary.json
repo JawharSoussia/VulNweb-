@@ -1,11 +1,13 @@
 {
-  "precision": 0.9841220032634618,
-  "recall": 0.9761376133463366,
-  "f1_score": 0.9801135475806031,
-  "roc_auc": 0.9998266893964567,
-  "test_samples": 381008,
-  "requirements_met": {
-    "recall_90_percent": true,
-    "f1_0_85": true
-  }
+  "accuracy": 0.9569173359541762,
+  "precision": 0.95636412152028,
+  "recall": 0.9569173359541762,
+  "f1_score": 0.9564209722986616,
+  "test_samples": 130238,
+  "class_distribution": {
+    "0": 85621,
+    "1": 19292,
+    "2": 25325
+  },
+  "model_name": "XGBoost"
 }

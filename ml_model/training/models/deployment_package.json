@@ -1,0 +1,84 @@
+{
+  "package_version": "1.0.0",
+  "model_name": "XGBoost_Threat_Classifier",
+  "model_type": "multi-class classification",
+  "task": "URL threat detection",
+  "num_classes": 3,
+  "class_names": [
+    "Safe",
+    "Threat Level 1",
+    "Threat Level 2"
+  ],
+  "input_features": [
+    "url_length",
+    "domain_length",
+    "path_length",
+    "query_length",
+    "fragment_length",
+    "num_dots_in_domain",
+    "num_dots_total",
+    "num_hyphens",
+    "num_slashes",
+    "num_question_marks",
+    "num_at_symbols",
+    "num_colons",
+    "num_subdomains",
+    "digit_ratio",
+    "special_char_ratio",
+    "uppercase_ratio",
+    "lowercase_ratio",
+    "consonant_ratio",
+    "has_http",
+    "has_https",
+    "has_ftp",
+    "has_www",
+    "has_port",
+    "is_ip_address",
+    "suspicious_keyword_count",
+    "tld_length",
+    "domain_entropy",
+    "url_entropy",
+    "has_encoded_chars",
+    "has_credentials",
+    "has_unusual_port",
+    "long_domain",
+    "dot_ratio",
+    "consonant_vowel_ratio",
+    "avg_word_length_domain",
+    "compression_ratio",
+    "slash_ratio"
+  ],
+  "num_features": 37,
+  "training_metrics": {
+    "LogisticRegression": {
+      "f1": 0.82827704871347,
+      "recall": 0.8392802753995982,
+      "precision": 0.8279928133856034,
+      "accuracy": 0.8392802753995982
+    },
+    "RandomForest": {
+      "f1": 0.9440865948764763,
+      "recall": 0.9435251660459937,
+      "precision": 0.945535623495061,
+      "accuracy": 0.9435251660459937
+    },
+    "XGBoost": {
+      "f1": 0.9564041518151779,
+      "recall": 0.9569009866779284,
+      "precision": 0.95635486150927,
+      "accuracy": 0.9569009866779284
+    }
+  },
+  "class_distribution": {
+    "0": 256861,
+    "1": 57874,
+    "2": 75970
+  },
+  "performance": {
+    "test_accuracy": 0.9569,
+    "test_f1_score": 0.9564,
+    "test_precision": 0.9564,
+    "test_recall": 0.9569
+  },
+  "trained_at": "2026-03-30T13:17:00.373030"
+}

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>VulNweb - Settings</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+    }
+    .header {
+      background: linear-gradient(135deg, #1976d2, #1565c0);
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }
+    .header h1 {
+      margin-bottom: 4px;
+      font-size: 28px;
+    }
+    .section {
+      background: white;
+      margin: 12px;
+      padding: 16px;
+      border-radius: 4px;
+      border-left: 4px solid #1976d2;
+    }
+    .section-title {
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #333;
+    }
+    .setting-row {
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .setting-label {
+      flex: 1;
+    }
+    .setting-label-main {
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .setting-label-help {
+      font-size: 12px;
+      color: #999;
+    }
+    input[type="text"],
+    input[type="number"],
+    select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: Arial, sans-serif;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    select:focus {
+      outline: none;
+      border-color: #1976d2;
+      box-shadow: 0 0 4px rgba(25, 118, 210, 0.2);
+    }
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 28px;
+      background: #ccc;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .toggle-switch.on {
+      background: #4CAF50;
+    }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: left 0.3s;
+    }
+    .toggle-switch.on::after {
+      left: 24px;
+    }
+    .range-slider {
+      width: 100%;
+      max-width: 150px;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    .range-value {
+      font-weight: bold;
+      color: #1976d2;
+      margin-left: 8px;
+      min-width: 30px;
+    }
+    .button-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    button {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+    .btn-save {
+      background: #4CAF50;
+      color: white;
+    }
+    .btn-save:hover {
+      background: #45a049;
+    }
+    .btn-save:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-reset {
+      background: #757575;
+      color: white;
+    }
+    .btn-reset:hover {
+      background: #616161;
+    }
+    .status-message {
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      display: none;
+    }
+    .status-success {
+      background: #4CAF5030;
+      color: #4CAF50;
+      border-left: 4px solid #4CAF50;
+      display: block;
+    }
+    .status-error {
+      background: #F4433630;
+      color: #F44336;
+      border-left: 4px solid #F44336;
+      display: block;
+    }
+    .advanced-section {
+      background: #f5f5f5;
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 4px;
+      display: none;
+    }
+    .advanced-section.show {
+      display: block;
+    }
+    .advanced-toggle {
+      color: #1976d2;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .sensitivity-legend {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #999;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>⚠️ VulNweb Settings</h1>
+    <p>Configure threat detection behavior</p>
+  </div>
+
+  <div class="section">
+    <div id="status-message" class="status-message"></div>
+  </div>
+
+  <!-- API Configuration -->
+  <div class="section">
+    <div class="section-title">🔌 API Configuration</div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">API Endpoint</div>
+        <div class="setting-label-help">Where threats are analyzed</div>
+      </div>
+      <input type="text" id="api-url" placeholder="http://localhost:8000" style="width: 200px;">
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">API Status</div>
+        <div class="setting-label-help">Health check</div>
+      </div>
+      <button id="btn-test-api" style="width: 100px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 8px;">
+        Test Connection
+      </button>
+    </div>
+  </div>
+
+  <!-- Detection Settings -->
+  <div class="section">
+    <div class="section-title">🎯 Detection Settings</div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">Threat Sensitivity</div>
+        <div class="setting-label-help">Higher = more sensitive</div>
+      </div>
+      <div class="range-slider">
+        <input type="range" id="sensitivity" min="1" max="10" value="5">
+        <span class="range-value" id="sensitivity-value">5</span>
+      </div>
+    </div>
+    <div class="sensitivity-legend">
+      <span>More Lenient</span>
+      <span>More Strict</span>
+    </div>
+
+    <div class="setting-row" style="margin-top: 12px;">
+      <div class="setting-label">
+        <div class="setting-label-main">Check Links on Page Load</div>
+        <div class="setting-label-help">Automatically scan all links</div>
+      </div>
+      <div class="toggle-switch" id="toggle-auto-check"></div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">Check Dynamic Content</div>
+        <div class="setting-label-help">Scan newly added links</div>
+      </div>
+      <div class="toggle-switch" id="toggle-dynamic"></div>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="section">
+    <div class="section-title">🔔 Notifications</div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">Show Desktop Notifications</div>
+        <div class="setting-label-help">Alert on critical threats</div>
+      </div>
+      <div class="toggle-switch" id="toggle-notifications"></div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">Notification Level</div>
+        <div class="setting-label-help">Minimum threat level to alert</div>
+      </div>
+      <select id="notification-level">
+        <option value="critical">Critical Only</option>
+        <option value="suspicious">Suspicious & Above</option>
+        <option value="all">All Threats</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Privacy & Data -->
+  <div class="section">
+    <div class="section-title">🔒 Privacy & Data</div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">Share Anonymous Stats</div>
+        <div class="setting-label-help">Help improve detection accuracy</div>
+      </div>
+      <div class="toggle-switch" id="toggle-analytics"></div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">Cache Predictions</div>
+        <div class="setting-label-help">Store locally for faster checks</div>
+      </div>
+      <div class="toggle-switch" id="toggle-cache"></div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-label-main">Cache Size</div>
+        <div class="setting-label-help">Maximum predictions to store</div>
+      </div>
+      <input type="number" id="cache-size" min="10" max="1000" value="500" style="width: 80px;">
+    </div>
+  </div>
+
+  <!-- Advanced -->
+  <div class="section">
+    <div class="advanced-toggle" id="toggle-advanced">+ Advanced Settings</div>
+
+    <div class="advanced-section" id="advanced-section">
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-label-main">Max Links to Check</div>
+          <div class="setting-label-help">Limit per page (0 = unlimited)</div>
+        </div>
+        <input type="number" id="max-links" min="0" max="100" value="0" style="width: 80px;">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-label-main">Request Timeout (ms)</div>
+          <div class="setting-label-help">How long to wait for API</div>
+        </div>
+        <input type="number" id="timeout" min="1000" max="30000" value="10000" style="width: 80px;">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-label-main">Debug Mode</div>
+          <div class="setting-label-help">Log detailed information</div>
+        </div>
+        <div class="toggle-switch" id="toggle-debug"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export/Import -->
+  <div class="section">
+    <div class="section-title">📤 Backup & Restore</div>
+
+    <div class="button-group">
+      <button style="background: #1976d2; color: white;" id="btn-export">Export Settings</button>
+      <button style="background: #1976d2; color: white;" id="btn-import">Import Settings</button>
+    </div>
+
+    <input type="file" id="import-file" style="display: none;" accept=".json">
+  </div>
+
+  <!-- Save/Reset -->
+  <div class="section">
+    <div class="button-group">
+      <button class="btn-save" id="btn-save">Save Settings</button>
+      <button class="btn-reset" id="btn-reset">Reset to Defaults</button>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

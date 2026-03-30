@@ -1,27 +1,12 @@
 {
-  "model_name": "XGBoost",
-  "trained_at": "2026-03-30T13:17:00.373030",
-  "cv_results": {
-    "LogisticRegression": {
-      "f1": 0.82827704871347,
-      "recall": 0.8392802753995982,
-      "precision": 0.8279928133856034,
-      "accuracy": 0.8392802753995982
-    },
-    "RandomForest": {
-      "f1": 0.9440865948764763,
-      "recall": 0.9435251660459937,
-      "precision": 0.945535623495061,
-      "accuracy": 0.9435251660459937
-    },
-    "XGBoost": {
-      "f1": 0.9564041518151779,
-      "recall": 0.9569009866779284,
-      "precision": 0.95635486150927,
-      "accuracy": 0.9569009866779284
-    }
-  },
-  "feature_names": [
+  "num_samples": 100,
+  "num_classes": 3,
+  "class_names": [
+    "Safe",
+    "Threat Level 1",
+    "Threat Level 2"
+  ],
+  "features": [
     "url_length",
     "domain_length",
     "path_length",
@@ -60,11 +45,9 @@
     "compression_ratio",
     "slash_ratio"
   ],
-  "target_col": "threat_level",
-  "num_classes": 3,
-  "class_distribution": {
-    "0": 256861,
-    "1": 57874,
-    "2": 75970
-  }
+  "base_values": [
+    1.6047800779342651,
+    -0.6439327001571655,
+    0.14737758040428162
+  ]
 }

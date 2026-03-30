@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Manage app startup and shutdown"""
     # Startup
-    logger.info("🚀 VulNweb API starting up...")
+    logger.info("VulNweb API starting up...")
     logger.info("Loading ML model package...")
 
     # Load model on startup

@@ -1,8 +1,9 @@
-              precision    recall  f1-score   support
+                precision    recall  f1-score   support
 
-        Safe     0.9965    0.9977    0.9971    332815
-      Threat     0.9841    0.9761    0.9801     48193
+          Safe     0.9684    0.9797    0.9740     85621
+Threat Level 1     0.9547    0.9815    0.9679     19292
+Threat Level 2     0.9169    0.8610    0.8881     25325
 
-    accuracy                         0.9950    381008
-   macro avg     0.9903    0.9869    0.9886    381008
-weighted avg     0.9950    0.9950    0.9950    381008
+      accuracy                         0.9569    130238
+     macro avg     0.9467    0.9408    0.9434    130238
+  weighted avg     0.9564    0.9569    0.9564    130238

@@ -490,19 +490,19 @@ curl -X POST "http://localhost:8000/api/feedback" \
 
 ## ✅ Checklist
 
-- [ ] Prediction request schema created with validation
-- [ ] Prediction response schema with all fields
-- [ ] POST /predict endpoint implemented
-- [ ] Input validation working
-- [ ] Model inference integrated
-- [ ] Explanations included in response
-- [ ] Request logging implemented
-- [ ] Batch endpoint created (optional)
-- [ ] Feedback endpoint implemented
-- [ ] Features endpoint created
-- [ ] All endpoints tested with curl
-- [ ] Error handling implemented
-- [ ] Commit: `git add . && git commit -m "Add prediction and feedback endpoints"`
+- [x] Prediction request schema created with validation
+- [x] Prediction response schema with all fields
+- [x] POST /predict endpoint implemented
+- [x] Input validation working
+- [x] Model inference integrated
+- [x] Explanations included in response
+- [x] Request logging implemented
+- [x] Batch endpoint created (optional)
+- [x] Feedback endpoint implemented
+- [x] Features endpoint created
+- [x] All endpoints tested with curl
+- [x] Error handling implemented
+- [x] Commit: `git add . && git commit -m "Add prediction and feedback endpoints"`
 
 ---
 

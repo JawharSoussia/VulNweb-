@@ -109,20 +109,16 @@ class ModelTrainer:
         logger.info("TRAINING: XGBoost")
         logger.info("=" * 60)
 
-        # Calculate scale_pos_weight to handle imbalance
-        neg_count = (self.y == 0).sum()
-        pos_count = (self.y == 1).sum()
-        scale_pos_weight = neg_count / pos_count
-
         model = XGBClassifier(
             n_estimators=200,
             max_depth=7,
             learning_rate=0.1,
             subsample=0.8,
             colsample_bytree=0.8,
-            scale_pos_weight=scale_pos_weight,
             random_state=42,
-            n_jobs=-1
+            n_jobs=-1,
+            objective='multi:softmax',  # Multi-class classification
+            num_class=3
         )
 
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -247,8 +243,8 @@ if __name__ == "__main__":
     # Load training data
     train_df = pd.read_csv("data/train/train_processed.csv")
 
-    # Train models
-    trainer = ModelTrainer(train_df)
+    # Train models (note: using 'threat_level' as target column instead of 'label')
+    trainer = ModelTrainer(train_df, target_col='threat_level')
     best_model, results, importance = trainer.train_all_models()
 
     # Save best model
