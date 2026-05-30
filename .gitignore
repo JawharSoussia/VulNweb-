@@ -37,8 +37,16 @@ env/
 # Data & Models
 data/raw/*
 data/processed/*
+data/train/*
+data/test/*
+data/val/*
 ml_model/training/models/*.pkl
 ml_model/training/models/*.joblib
+ml_model/inference/models/*
+ml_model/inference/shap_explainer.pkl
+
+# Generated docs/artifacts
+projet.pdf
 
 # Environment variables
 .env
