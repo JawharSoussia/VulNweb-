@@ -38,7 +38,7 @@ Chrome Extension → FastAPI Backend → ML Model → PostgreSQL
                         ↓
                    Threat Intelligence APIs
                         ├─ VirusTotal (URL/File)
-                        ├─ UNSW-NB15 (Network)
+                        ├─ Model 
                         └─ Slack Alerts
 ```
 
