@@ -113,26 +113,25 @@ const requestBatcher = new RequestBatcher(
   CONFIG.BATCH_SIZE,
   CONFIG.BATCH_TIMEOUT,
   async (requests) => {
-    // Batch predict
-    const features = requests.map(r => r.features);
-    // In future: send all at once to /api/predict-batch
-    return Promise.all(features.map(f => predictSingle(f)));
+    // Batch predict with URLs
+    const urls = requests.map(r => r.url);
+    return Promise.all(urls.map(u => predictSingle(u)));
   }
 );
 
 /**
  * Single prediction with timeout and enhanced error handling
  */
-async function predictSingle(features, retryCount = 0) {
+async function predictSingle(url, retryCount = 0) {
   const MAX_RETRIES = 2;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
   try {
-    const response = await fetch(`${CONFIG.API_URL}/api/predict-raw`, {
+    const response = await fetch(`${CONFIG.API_URL}/api/predict`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features }),
+      body: JSON.stringify({ url }),
       signal: controller.signal
     });
 
@@ -145,7 +144,7 @@ async function predictSingle(features, retryCount = 0) {
         const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
         console.warn(`[VulNweb BG] Rate limited (429). Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return predictSingle(features, retryCount + 1);
+        return predictSingle(url, retryCount + 1);
       }
       throw new Error('API rate limited - too many requests');
     }
@@ -210,17 +209,14 @@ async function checkThreat(data, sender) {
       domain: extractDomain(url)
     });
 
-    // Generate deterministic features from URL (same URL = same features)
-    const features = data.features || generateFeatures(url);
-
-    // Use batcher for efficiency
+    // Use batcher for efficiency (let backend extract features from URL)
     let prediction;
     try {
-      prediction = await requestBatcher.add({ features });
+      prediction = await requestBatcher.add({ url });
     } catch (batchError) {
       // If batching fails, try direct prediction with user feedback
       console.warn('[VulNweb BG] Batch processing failed, attempting direct prediction:', batchError.message);
-      prediction = await predictSingle(features);
+      prediction = await predictSingle(url);
     }
 
     // Cache result (use standardized cache key)
@@ -270,35 +266,6 @@ function extractDomain(urlString) {
   } catch (e) {
     return null;
   }
-}
-
-/**
- * Generate deterministic 34 features from URL (same URL = same features)
- */
-function generateFeatures(url = '') {
-  // Use URL hash to seed feature generation for consistency
-  let hash = 0;
-  const seed = url || Math.random().toString();
-
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-
-  // Seeded random function for reproducibility
-  const seededRandom = (seed) => {
-    const x = Math.sin(seed) * 10000;
-    return x - Math.floor(x);
-  };
-
-  // Generate 34 features deterministically
-  const features = [];
-  for (let i = 0; i < 34; i++) {
-    features[i] = seededRandom(hash + i) * 10;
-  }
-
-  return features;
 }
 
 /**
@@ -407,14 +374,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'CHECK_THREAT') {
     checkThreat(request.data, sender)
       .then(response => sendResponse(response))
-      .catch(error => sendResponse({ error: error.message }));
+      .catch(error => {
+        const errorMsg = error?.message || error?.error || String(error);
+        sendResponse({ error: errorMsg, threat_level: 'unknown', threat_score: 0, confidence: 0 });
+      });
     return true;
   }
 
   if (request.type === 'GET_STATS') {
     getStats()
       .then(stats => sendResponse(stats))
-      .catch(error => sendResponse({ error: error.message }));
+      .catch(error => {
+        const errorMsg = error?.message || String(error);
+        sendResponse({ error: errorMsg });
+      });
     return true;
   }
 

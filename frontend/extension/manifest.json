@@ -4,7 +4,7 @@
   "version": "0.3.1",
   "description": "Real-time threat detection powered by ML",
 
-  "permissions": ["activeTab", "scripting", "storage", "notifications"],
+  "permissions": ["activeTab", "scripting", "storage", "notifications", "alarms"],
   "host_permissions": ["<all_urls>"],
 
   "content_scripts": [{

@@ -129,16 +129,72 @@ async def predict(request_data: PredictionRequest, request: Request) -> Predicti
             )
 
         # ====================================================================
-        # 3. MAKE PREDICTION
+        # 3. EXTRACT NEW THREAT FEATURES
         # ====================================================================
 
-        prediction = model_package.predict(X)
+        # Extract the new threat detection features (last 3 features)
+        # These are: is_shortener_url, has_executable_extension, has_redirect_parameter
+        new_threat_features = {
+            'is_shortener_url': X[0, -3],
+            'has_executable_extension': X[0, -2],
+            'has_redirect_parameter': X[0, -1]
+        }
+
+        # Use only the first 37 features for the model (backward compatibility)
+        X_model = X[:, :37]
+
+        # ====================================================================
+        # 4. MAKE PREDICTION
+        # ====================================================================
+
+        prediction = model_package.predict(X_model)
 
         threat_score = prediction['threat_score']
         confidence = prediction['confidence']
         threat_level = prediction['threat_level']
         predicted_class = prediction['prediction']
         probabilities = prediction['probabilities']
+
+        # ====================================================================
+        # 5. APPLY THREAT FEATURE BOOSTING
+        # ====================================================================
+
+        threat_boost = 0
+        threat_indicators = []
+
+        # Check for URL shortener (high confidence signal)
+        if new_threat_features['is_shortener_url'] > 0.5:
+            threat_boost += 25
+            threat_indicators.append("URL shortened (bit.ly, tinyurl, etc.)")
+
+        # Check for executable file extensions
+        if new_threat_features['has_executable_extension'] > 0.5:
+            threat_boost += 30
+            threat_indicators.append("Executable file download detected (.exe, .dll, etc.)")
+
+        # Check for redirect parameters
+        if new_threat_features['has_redirect_parameter'] > 0.5:
+            threat_boost += 20
+            threat_indicators.append("Redirect parameter detected in URL")
+
+        # Apply threat boost to score
+        if threat_boost > 0:
+            threat_score = min(100, threat_score + threat_boost)
+            # Update threat level if boosted above thresholds
+            if threat_score >= 67 and predicted_class < 2:
+                threat_level = "critical"
+                predicted_class = 2
+                probabilities['threat_level_2'] = max(probabilities.get('threat_level_2', 0), 0.8)
+                probabilities['safe'] = min(probabilities.get('safe', 0), 0.1)
+                probabilities['threat_level_1'] = 1 - probabilities['safe'] - probabilities.get('threat_level_2', 0)
+            elif threat_score >= 34 and predicted_class < 1:
+                threat_level = "suspicious"
+                predicted_class = 1
+                probabilities['threat_level_1'] = max(probabilities.get('threat_level_1', 0), 0.6)
+                probabilities['safe'] = min(probabilities.get('safe', 0), 0.3)
+                probabilities['threat_level_2'] = 1 - probabilities['safe'] - probabilities.get('threat_level_1', 0)
+
+            logger.info(f"[{request_id}] Threat boost applied: +{threat_boost} → score={threat_score:.1f}")
 
         logger.info(
             f"[{request_id}] Prediction: {threat_level} "
@@ -153,11 +209,15 @@ async def predict(request_data: PredictionRequest, request: Request) -> Predicti
         try:
             # Get SHAP explanations if available
             if model_package.explainer is not None:
-                explanations = model_package.explain(X, k=3)
+                explanations = model_package.explain(X_model, k=3)
                 if explanations and len(explanations) > 0:
                     explanation_list = explanations[0]
         except Exception as e:
             logger.warning(f"[{request_id}] SHAP explanations unavailable: {e}")
+
+        # Add threat indicators from new features to explanations
+        if threat_indicators and len(explanation_list) < 3:
+            explanation_list.extend(threat_indicators)
 
         # Fallback explanations based on threat level
         if not explanation_list:

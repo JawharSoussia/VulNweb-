@@ -5,11 +5,25 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Overview
-VulNweb is an intelligent Chrome extension powered by machine learning that provides real-time threat detection and analysis for browsing security. It integrates UNSW-NB15 network threat detection with VirusTotal URL/file analysis.
+VulNweb is an intelligent Chrome extension powered by machine learning that provides real-time threat detection and analysis for browsing security. It integrates network threat detection with VirusTotal URL/file analysis.
+## PROJECT PURPOSE
+
+VulNweb is an intelligent security system designed to provide **real-time URL threat detection and analysis** for web browsing. The system uses machine learning with explainable AI to classify URLs as safe, suspicious, or malicious:
+
+- **Malicious URLs** - Detection of phishing, malware distribution, credential harvesting sites
+- **Suspicious URLs** - Identification of suspicious patterns and potentially harmful URLs
+- **Safe URLs** - Classification of legitimate, trusted URLs
+- **Explainable Predictions** - SHAP values show top 3 decision reasons for each classification
+
+**Key Objectives:**
+- Deliver <500ms response time for URL threat analysis
+- Achieve 95%+ accuracy in URL threat classification
+- Provide explainable AI predictions (SHAP values showing decision reasons)
+- Detect malicious URLs, phishing, and suspicious patterns
+- Enable real-time browser protection via Chrome extension
 
 ## Features
-- Real-time threat detection using XGBoost ML model trained on UNSW-NB15
-- Network traffic analysis with attack classification (DoS, Exploits, Backdoors, etc.)
+- Real-time threat detection using XGBoost ML model 
 - VirusTotal API integration for URL and file hash analysis
 - Color-coded threat indicators (Green/Orange/Red)
 - Explainable AI with top 3 decision reasons
@@ -28,29 +42,68 @@ Chrome Extension → FastAPI Backend → ML Model → PostgreSQL
                         └─ Slack Alerts
 ```
 
-## Tech Stack
-- **Backend:** FastAPI, PostgreSQL, SQLAlchemy
-- **ML:** XGBoost, SHAP, Scikit-learn
-- **Dataset:** UNSW-NB15 (2.5M network flow records)
-- **Threat Intelligence:** VirusTotal API
-- **Frontend:** JavaScript, Chrome API
-- **DevOps:** Docker, Docker-Compose, GitHub Actions
-- **Monitoring:** Grafana, Prometheus
 
-## Datasets & APIs
 
-### UNSW-NB15 Dataset
-- **Source:** [Kaggle UNSW-NB15](https://www.kaggle.com/datasets/mrwellsdavid/unsw-nb15)
-- **Samples:** 2,540,047 network flows
-- **Features:** 47 network and traffic features
-- **Attack Categories:** DoS, Exploits, Backdoors, Analysis, Fuzzers, Reconnaissance, Shellcode, Generic, Worms
-- **Training:** Automatically downloaded and cached
+## TECHNOLOGY STACK
 
-### VirusTotal API
-- **Capabilities:** URL scanning, file hash lookup, malware detection
-- **Detections:** Multi-vendor analysis (70+ antivirus engines)
-- **Rate Limits:** Follow free tier limits
-- **Setup:** Set `VIRUSTOTAL_API_KEY` environment variable
+### Backend
+- **Framework:** FastAPI 0.104.1
+- **Server:** Uvicorn 0.24.0
+- **Language:** Python 3.10+
+- **Database:** PostgreSQL with SQLAlchemy ORM (optional, for production)
+- **ORM:** Alembic for migrations
+
+### Machine Learning
+- **Primary Model:** XGBoost 2.0.2
+- **Model Selection:** Scikit-learn 1.3.2
+- **Data Processing:** Pandas 2.1.3, NumPy 1.26.2
+- **Explainability:** SHAP 0.43.0, LIME 0.2.0.1
+- **Data Imbalance:** Imbalanced-learn 0.11.0 (if needed)
+
+### Frontend
+- **Browser:** Chrome/Chromium-based
+- **Technology:** Vanilla JavaScript
+- **Chrome APIs:**
+  - `webRequest` - Request interception
+  - `storage` - Local settings persistence
+  - `alarms` - Background task scheduling
+  - `contextMenus` - Right-click menu integration
+
+### Threat Intelligence
+- **VirusTotal API:** vt-py 0.22.0
+- **Dataset Source:** Kaggle
+
+### DevOps & Deployment
+- **Containerization:** Docker, Docker-Compose
+- **Configuration:** Python-dotenv 1.0.0
+- **Testing:** pytest 7.4.3, pytest-asyncio 0.21.1
+- **Code Quality:** Black 23.12.0, Flake8 6.1.0, isort 5.13.2, mypy 1.7.1
+
+### Utilities
+- **HTTP Requests:** requests 2.31.0, httpx 0.25.1
+- **Validation:** Pydantic 2.5.0
+- **Configuration:** YAML, JSON
+- **Logging:** Python-json-logger 2.0.7
+
+---
+
+## 6. TEAM & PERSONNEL
+
+### Project Lead & Developer
+**Name:** Soussai Jawhar
+**Role:** Full Stack Developer / ML Engineer
+**Responsibilities:**
+- Architecture design and planning
+- Data engineering and feature extraction
+- ML model development and optimization
+- FastAPI backend implementation
+- Chrome extension development
+- API integration and testing
+- Documentation and deployment
+- Performance optimization
+
+**Contact:** soussiajawhar2@gmail.com
+
 
 ## Quick Start
 
@@ -59,14 +112,13 @@ Chrome Extension → FastAPI Backend → ML Model → PostgreSQL
 - Docker & Docker-Compose
 - Chrome Browser
 - Kaggle API credentials (optional, for automatic dataset download)
-- VirusTotal API key (optional, for threat intelligence)
 
 ### Local Development
 
 ```bash
 # Clone and navigate
 git clone <repo-url>
-cd projet\ 2
+cd projet\ VulNweb
 
 # Create virtual environment
 python -m venv venv
@@ -75,25 +127,12 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment variables
-cat > .env << EOF
-VIRUSTOTAL_API_KEY=your_virustotal_api_key_here
-EOF
 
 # Start services
 docker-compose up
 
 # Run API
 uvicorn backend.app.main:app --reload
-```
-
-### Configure Kaggle API (Optional)
-For automatic dataset download:
-```bash
-# Download credentials from Kaggle account settings
-mkdir -p ~/.kaggle
-cp kaggle.json ~/.kaggle/
-chmod 600 ~/.kaggle/kaggle.json
 ```
 
 ### Install Chrome Extension
@@ -104,28 +143,18 @@ chmod 600 ~/.kaggle/kaggle.json
 4. Select `frontend/extension/` folder
 
 ## API Endpoints
-
+### Run backend server
+```bash
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+ 
 ### Health Check
 ```bash
 GET /health
 ```
 
-### VirusTotal Integration
-```bash
-# Scan URL
-POST /threats/virustotal/scan-url
-{
-  "url": "https://example.com"
-}
 
-# Scan File Hash
-POST /threats/virustotal/scan-file
-{
-  "file_hash": "e4d909c290d0fb1ca068ffaddf22cbd0"
-}
-```
-
-### Network Threat Detection (UNSW-NB15)
+### Network Threat Detection
 ```bash
 # Analyze network flow
 POST /threats/network/analyze
@@ -164,7 +193,7 @@ GET /threats/dataset/info
 ```
 
 ## Project Structure
-See `PROJECT_PLAN.md` for detailed breakdown.
+
 
 ```
 .
@@ -174,7 +203,7 @@ See `PROJECT_PLAN.md` for detailed breakdown.
 │       ├── models.py               # Database models
 │       ├── schemas.py              # Pydantic schemas
 │       ├── virustotal_client.py    # VirusTotal API integration
-│       └── dataset_loader.py       # UNSW-NB15 dataset handling
+│       └── dataset_loader.py       # dataset handling
 ├── frontend/
 │   └── extension/                  # Chrome extension files
 ├── docker-compose.yml              # Multi-container setup
@@ -183,8 +212,7 @@ See `PROJECT_PLAN.md` for detailed breakdown.
 ```
 
 ## Environment Variables
-```bash
-VIRUSTOTAL_API_KEY=your_api_key       # VirusTotal API key (optional)
+```bash    # VirusTotal API key (optional)
 DATABASE_URL=postgresql://...         # PostgreSQL connection
 SLACK_WEBHOOK_URL=https://...         # Slack alerts (optional)
 ```

@@ -22,7 +22,8 @@ class URLFeatureExtractor:
         'suspicious_keyword_count', 'tld_length', 'domain_entropy',
         'url_entropy', 'has_encoded_chars', 'has_credentials',
         'has_unusual_port', 'long_domain', 'dot_ratio', 'consonant_vowel_ratio',
-        'avg_word_length_domain', 'compression_ratio', 'slash_ratio'
+        'avg_word_length_domain', 'compression_ratio', 'slash_ratio',
+        'is_shortener_url', 'has_executable_extension', 'has_redirect_parameter'
     ]
 
     SUSPICIOUS_KEYWORDS = [
@@ -31,6 +32,21 @@ class URLFeatureExtractor:
         'confirm', 'action', 'secure', 'click', 'urgent', 'login', 'signin',
         'paypal', 'amazon', 'apple', 'bank', 'account'
     ]
+
+    # URL shortening services
+    SHORTENER_DOMAINS = [
+        'bit.ly', 'bitly.com', 'tinyurl.com', 'short.link', 'ow.ly', 'tiny.cc',
+        'is.gd', 'buff.ly', 'adf.ly', 'shorte.st', 'short.st', 'goo.gl',
+        'clck.ru', 'lnk.co', 'j.mp'
+    ]
+
+    # Executable extensions
+    EXECUTABLE_EXTENSIONS = ['.exe', '.dll', '.bat', '.cmd', '.zip', '.rar',
+                           '.7z', '.iso', '.dmg', '.app', '.scr', '.pif']
+
+    # Redirect parameter names
+    REDIRECT_PARAMETERS = ['redirect', 'return', 'return_to', 'redirect_to',
+                          'goto', 'go', 'url', 'target', 'next', 'continue']
 
     def __init__(self):
         """Initialize feature extractor"""
@@ -170,6 +186,24 @@ class URLFeatureExtractor:
             features['compression_ratio'] = unique_chars / len(url) if len(url) > 0 else 0
 
             # ================================================================
+            # 13. URL SHORTENER DETECTION
+            # ================================================================
+
+            features['is_shortener_url'] = 1.0 if self._is_shortener_domain(domain) else 0.0
+
+            # ================================================================
+            # 14. EXECUTABLE FILE DETECTION
+            # ================================================================
+
+            features['has_executable_extension'] = 1.0 if self._has_executable_extension(url) else 0.0
+
+            # ================================================================
+            # 15. REDIRECT PARAMETER DETECTION
+            # ================================================================
+
+            features['has_redirect_parameter'] = 1.0 if self._has_redirect_parameter(query) else 0.0
+
+            # ================================================================
             # CREATE FEATURE VECTOR
             # ================================================================
 
@@ -249,3 +283,19 @@ class URLFeatureExtractor:
 
         return entropy
 
+    def _is_shortener_domain(self, domain: str) -> bool:
+        """Check if domain is a known URL shortener"""
+        domain_lower = domain.lower()
+        return any(shortener in domain_lower for shortener in self.SHORTENER_DOMAINS)
+
+    def _has_executable_extension(self, url: str) -> bool:
+        """Check if URL contains executable file extensions"""
+        url_lower = url.lower()
+        return any(ext in url_lower for ext in self.EXECUTABLE_EXTENSIONS)
+
+    def _has_redirect_parameter(self, query: str) -> bool:
+        """Check if query contains redirect parameters"""
+        if not query:
+            return False
+        query_lower = query.lower()
+        return any(param in query_lower for param in self.REDIRECT_PARAMETERS)

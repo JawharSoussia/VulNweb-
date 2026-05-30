@@ -27,7 +27,7 @@ async function displayCurrentAnalysis() {
 
       document.getElementById('current-analysis').innerHTML = `
         <div class="threat-level ${analysis.threat_level}">
-          ${analysis.threat_level.toUpperCase()} (${confidence.toFixed(1)}%)
+          ${(analysis.threat_level || 'unknown').toUpperCase()} (${confidence.toFixed(1)}%)
         </div>
       `;
       return;
@@ -38,6 +38,10 @@ async function displayCurrentAnalysis() {
 
     if (analysis.error) {
       throw new Error(analysis.error);
+    }
+
+    if (!analysis.threat_level) {
+      throw new Error('Invalid response: missing threat_level');
     }
 
     const confidence = analysis.confidence > 1 ? analysis.confidence : analysis.confidence * 100;
@@ -79,7 +83,6 @@ async function displayStats() {
     document.getElementById('stat-total').textContent = stats.total;
     document.getElementById('stat-threats').textContent = stats.threats;
     document.getElementById('stat-critical').textContent = stats.critical;
-    document.getElementById('stat-cache').textContent = stats.total;
 
   } catch (error) {
     console.error('Stats error:', error);
