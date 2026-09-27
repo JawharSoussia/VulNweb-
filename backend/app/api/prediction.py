@@ -12,6 +12,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 feature_extractor = URLFeatureExtractor()
 
+# Frozen raw-feature contract for /api/predict-raw
+RAW_FEATURE_NAMES = [
+    'dintpkt', 'sport', 'sttl', 'dloss', 'ct_srv_src',
+    'ct_srv_dst', 'ct_dst_ltm', 'ct_src_ltm', 'ct_dst_sport',
+    'ct_dst_src_ltm', 'ct_flw_http_mthd', 'is_ftp_login',
+    'ct_ftp_cmd', 'ct_srv_admin', 'ct_srv_http', 'ct_src_dport_ltm',
+    'ct_proto_udp', 'ct_proto_tcp', 'ct_proto_icmp', 'dmeansz',
+    'djit', 'drate', 'dminsz', 'dpkt', 'dscore',
+    'dtwin', 'dttl', 'dur', 'rate', 'res_bdy_len',
+    'res_del_time', 'response_body_len', 'service_response_time', 'smeansz'
+]
+
 
 # ============================================================================
 # SCHEMAS (Request/Response Models)
@@ -360,17 +372,12 @@ async def get_model_info(request: Request):
 
 @router.get("/features")
 async def get_features(request: Request):
-    """Get list of features expected by the model"""
-
-    model_package = request.app.state.model_package
-
-    if model_package is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+    """Get list of features expected by /api/predict-raw"""
 
     return {
-        "feature_count": len(model_package.feature_names),
-        "features": model_package.feature_names,
-        "description": "These are the URL features extracted for ML prediction"
+        "feature_count": len(RAW_FEATURE_NAMES),
+        "features": RAW_FEATURE_NAMES,
+        "description": "These are the raw numeric features expected by /api/predict-raw"
     }
 
 
@@ -418,10 +425,10 @@ async def predict_raw(request_data: RawPredictionRequest, request: Request) -> P
             )
 
         # Validate feature vector
-        if len(request_data.features) != 34:
+        if len(request_data.features) != len(RAW_FEATURE_NAMES):
             raise HTTPException(
                 status_code=400,
-                detail=f"Expected 34 features, got {len(request_data.features)}"
+                detail=f"Expected {len(RAW_FEATURE_NAMES)} features, got {len(request_data.features)}"
             )
 
         # Convert to numpy array

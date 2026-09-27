@@ -17,11 +17,11 @@ curl -s "$BASE_URL/health" | jq . || echo "⚠️  API not running"
 echo ""
 echo ""
 
-# 2. Batch Analysis
-echo "2️⃣  Test Batch Analysis (Multiple URLs)"
-echo "Command: curl -X POST $BASE_URL/threats/batch-analyze"
+# 2. Batch Prediction
+echo "2️⃣  Test Batch Prediction (Multiple URLs)"
+echo "Command: curl -X POST $BASE_URL/api/predict-batch"
 echo ""
-curl -s -X POST "$BASE_URL/threats/batch-analyze" \
+curl -s -X POST "$BASE_URL/api/predict-batch" \
   -H "Content-Type: application/json" \
   -d '{
     "urls": [
@@ -33,62 +33,25 @@ curl -s -X POST "$BASE_URL/threats/batch-analyze" \
 echo ""
 echo ""
 
-# 3. Network Threat Analysis
-echo "3️⃣  Test Network Threat Analysis"
-echo "Command: curl -X POST $BASE_URL/threats/network/analyze"
+# 3. URL Threat Prediction
+echo "3️⃣  Test URL Threat Prediction"
+echo "Command: curl -X POST $BASE_URL/api/predict"
 echo ""
-curl -s -X POST "$BASE_URL/threats/network/analyze" \
+curl -s -X POST "$BASE_URL/api/predict" \
   -H "Content-Type: application/json" \
   -d '{
-    "flow_data": {
-      "dur": 100.5,
-      "sbytes": 5000,
-      "dbytes": 10000,
-      "spkts": 50,
-      "dpkts": 100,
-      "swin": 65535,
-      "dwin": 65535,
-      "sload": 500.0,
-      "dload": 1000.0,
-      "stcpb": 1,
-      "dtcpb": 1,
-      "smeansz": 100.0,
-      "dmeansz": 100.0,
-      "response_body_len": 50000,
-      "sjit": 0.5,
-      "djit": 0.5,
-      "stime": 1000,
-      "ltime": 2000,
-      "sintpkt": 0.1,
-      "dintpkt": 0.1,
-      "tcprtt": 0.05,
-      "synack": 0.02,
-      "ackdat": 0.03,
-      "is_sm_ips_ports": 0,
-      "ct_state_ttl": 64,
-      "ct_flw_http_mthd": 1,
-      "is_ftp_login": 0,
-      "ct_ftp_cmd": 0,
-      "ct_srv_src": 10,
-      "ct_srv_dst": 10,
-      "ct_dst_ltm": 5,
-      "ct_src_ltm": 5,
-      "ct_src_dport_ltm": 3,
-      "ct_dst_sport_ltm": 3,
-      "ct_dst_src_ltm": 2,
-      "is_sb_flow": 0
-    }
-  }' | jq . || echo "⚠️  Network analysis failed"
+    "url": "https://example.com/login?redirect=http://evil.test"
+  }' | jq . || echo "⚠️  URL prediction failed"
 echo ""
 echo ""
 
-# 4. VirusTotal Scan (if API key is configured)
-echo "4️⃣  Test VirusTotal Scan"
-echo "Command: curl -X POST $BASE_URL/threats/virustotal/scan-url"
+# 4. Raw Feature Prediction
+echo "4️⃣  Test Raw Feature Prediction"
+echo "Command: curl -X POST $BASE_URL/api/predict-raw"
 echo ""
-curl -s -X POST "$BASE_URL/threats/virustotal/scan-url" \
+curl -s -X POST "$BASE_URL/api/predict-raw" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.eicar.org/download/eicar.com.txt"}' | jq . || echo "⚠️  VirusTotal scan failed (API key may not be configured)"
+  -d '{"features": [5, 443, 64, 0, 2, 1, 10, 20, 1, 5, 0, 0, 0, 0, 1, 10, 0, 1, 0, 100, 0.1, 0.2, 50, 100, 0, 64, 100, 2.5, 0.8, 1024, 0.1, 2048, 1.5, 256]}' | jq . || echo "⚠️  Raw prediction failed"
 echo ""
 echo ""
 

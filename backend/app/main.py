@@ -1,12 +1,12 @@
 """FastAPI Application Setup"""
+from contextlib import asynccontextmanager
+import logging
+from pathlib import Path
+import sys
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
-import logging
-from typing import Optional
-import sys
-from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -127,171 +127,30 @@ async def health_check():
     }
 
 
-@app.get("/docs")
-async def docs():
-    """API documentation"""
+@app.get("/api/endpoints")
+async def endpoints():
+    """List the frozen API contract"""
     return {
-        "documentation": "See /docs for interactive Swagger UI",
+        "namespace": "/api",
         "endpoints": {
-            "GET /": "Root endpoint",
-            "GET /health": "Health check",
-            "POST /predict": "Make threat prediction",
-            "POST /feedback": "Send user feedback",
-            "GET /model-info": "Model information"
-        }
-    }
-
-
-@app.get("/model-info")
-async def model_info():
-    """Get model information"""
-    if app.state.model_package is None:
-        return {"error": "Model not loaded"}
-
-    metadata = app.state.model_package.metadata or {}
-
-    return {
-        "model_name": metadata.get('model_name', 'unknown'),
-        "version": metadata.get('trained_at', 'unknown'),
-        "features": len(app.state.model_package.feature_names),
-        "feature_names": app.state.model_package.feature_names[:10]  # Show first 10
+            "POST /api/predict": "Predict URL threat level",
+            "POST /api/predict-raw": "Predict threat from raw feature vector",
+            "POST /api/predict-batch": "Predict threats for a batch of URLs",
+            "GET /api/features": "List model feature names",
+            "GET /api/model-info": "Get loaded model metadata",
+            "POST /api/feedback": "Submit prediction feedback",
+            "GET /api/status": "API status route"
+        },
+        "documentation": "See /docs for interactive Swagger UI"
     }
 
 
 # Import route modules
-from .api import prediction, feedback, health
-from .feature_extractor import URLFeatureExtractor
-from .api.prediction import PredictionRequest, PredictionResponse
-from fastapi import HTTPException
-from datetime import datetime
-import logging
+from .api import feedback, health, prediction
 
-extractor = URLFeatureExtractor()
-logger = logging.getLogger(__name__)
-
-# Override predict endpoint with threat boost
-@app.post("/api/predict", response_model=PredictionResponse)
-async def predict_with_boost(request_data: PredictionRequest, request: Request) -> PredictionResponse:
-    """Predict threat level with enhanced threat feature boost"""
-    request_id = f"req_{datetime.now().timestamp():.0f}"
-
-    try:
-        logger.info(f"[{request_id}] Prediction with boost: {request_data.url[:80]}")
-
-        # Get model
-        model_package = request.app.state.model_package
-        if model_package is None:
-            raise HTTPException(status_code=503, detail="Model not available")
-
-        # Extract features
-        X = extractor.extract(request_data.url)
-
-        # Extract threat features
-        new_threat_features = {
-            'is_shortener_url': X[0, -3],
-            'has_executable_extension': X[0, -2],
-            'has_redirect_parameter': X[0, -1]
-        }
-
-        # Use only first 37 features for model
-        X_model = X[:, :37]
-        prediction = model_package.predict(X_model)
-
-        threat_score = prediction['threat_score']
-        confidence = prediction['confidence']
-        threat_level = prediction['threat_level']
-        predicted_class = prediction['prediction']
-        probabilities = prediction['probabilities']
-
-        # Apply threat boost
-        threat_boost = 0
-        threat_indicators = []
-
-        if new_threat_features['is_shortener_url'] > 0.5:
-            threat_boost += 25
-            threat_indicators.append("URL shortened (bit.ly, tinyurl, etc.)")
-
-        if new_threat_features['has_executable_extension'] > 0.5:
-            threat_boost += 30
-            threat_indicators.append("Executable file download detected (.exe, .dll, etc.)")
-
-        if new_threat_features['has_redirect_parameter'] > 0.5:
-            threat_boost += 20
-            threat_indicators.append("Redirect parameter detected in URL")
-
-        if threat_boost > 0:
-            threat_score = min(100, threat_score + threat_boost)
-            if threat_score >= 67 and predicted_class < 2:
-                threat_level = "critical"
-                predicted_class = 2
-            elif threat_score >= 34 and predicted_class < 1:
-                threat_level = "suspicious"
-                predicted_class = 1
-            logger.info(f"[{request_id}] Boost: +{threat_boost} -> {threat_score:.0f}")
-
-        # Build response
-        response = PredictionResponse(
-            threat_score=threat_score,
-            threat_level=threat_level,
-            confidence=confidence,
-            predicted_class=predicted_class,
-            probabilities=probabilities,
-            explanation=threat_indicators[:3],
-            model_version=model_package.metadata.get('model_name', 'XGBoost v1.0'),
-            request_id=request_id,
-            timestamp=datetime.utcnow().isoformat() + "Z"
-        )
-
-        logger.info(f"[{request_id}] Response: {threat_level} ({threat_score:.0f})")
-        return response
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[{request_id}] Error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Prediction failed")
-
-# Batch prediction endpoint (uses the predict_with_boost function above)
-from typing import List
-from pydantic import BaseModel, Field
-
-class BatchPredictionRequest(BaseModel):
-    urls: List[str] = Field(..., max_length=100)
-
-class BatchPredictionResponse(BaseModel):
-    results: List[PredictionResponse]
-    batch_id: str
-    total: int
-    successful: int
-    failed: int
-
-@app.post("/api/predict-batch", response_model=BatchPredictionResponse)
-async def predict_batch_with_boost(batch_request: BatchPredictionRequest, request: Request) -> BatchPredictionResponse:
-    """Batch predictions with threat boost"""
-    batch_id = f"batch_{datetime.now().timestamp():.0f}"
-    results = []
-    failed = 0
-
-    for idx, url in enumerate(batch_request.urls):
-        try:
-            pred_response = await predict_with_boost(PredictionRequest(url=url), request)
-            results.append(pred_response)
-        except Exception as e:
-            logger.error(f"[{batch_id}] URL {idx} failed: {e}")
-            failed += 1
-
-    return BatchPredictionResponse(
-        results=results,
-        batch_id=batch_id,
-        total=len(batch_request.urls),
-        successful=len(results),
-        failed=failed
-    )
-
-# Include other routers (prediction handled directly above)
-# app.include_router(prediction.router, prefix="/api", tags=["Prediction"], include_in_schema=False)
 app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
 app.include_router(health.router, prefix="/api", tags=["Health"])
+app.include_router(prediction.router, prefix="/api", tags=["Prediction"])
 
 
 if __name__ == "__main__":

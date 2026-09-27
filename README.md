@@ -154,42 +154,37 @@ GET /health
 ```
 
 
-### Network Threat Detection
+### URL Threat Prediction
 ```bash
-# Analyze network flow
-POST /threats/network/analyze
+# Analyze a URL
+POST /api/predict
 {
-  "source_ip": "192.168.1.100",
-  "destination_ip": "10.0.0.50",
-  "source_port": 52345,
-  "destination_port": 80,
-  "protocol": "TCP",
-  "flow_duration": 45.5,
-  "total_fwd_packets": 25,
-  "total_bwd_packets": 23
+  "url": "https://example.com/login"
 }
 ```
 
-### Batch Analysis
+### Raw Feature Prediction
 ```bash
-# Analyze multiple threats
-POST /threats/batch-analyze
+# Predict from pre-extracted feature vector
+POST /api/predict-raw
 {
-  "urls": ["https://example1.com", "https://example2.com"],
-  "file_hashes": ["e4d909c290d0fb1ca068ffaddf22cbd0"],
-  "network_flows": [
-    {
-      "source_ip": "192.168.1.100",
-      "destination_ip": "10.0.0.50",
-      ...
-    }
-  ]
+  "features": [5, 443, 64, 0, 2, 1, 10, 20, 1, 5, 0, 0, 0, 0, 1, 10, 0, 1, 0, 100, 0.1, 0.2, 50, 100, 0, 64, 100, 2.5, 0.8, 1024, 0.1, 2048, 1.5, 256]
 }
 ```
 
-### Dataset Information
+### Batch Prediction
 ```bash
-GET /threats/dataset/info
+POST /api/predict-batch
+{
+  "urls": ["https://example1.com", "https://example2.com"]
+}
+```
+
+### API Metadata
+```bash
+GET /api/features
+GET /api/model-info
+GET /api/status
 ```
 
 ## Project Structure

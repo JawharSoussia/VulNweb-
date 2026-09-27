@@ -1,305 +1,113 @@
 """
-VulNweb API Usage Examples
-
-This script demonstrates how to use the VulNweb API with:
-- VirusTotal integration
-- UNSW-NB15 network threat detection
-- Batch analysis
+VulNweb API Usage Examples (frozen /api contract)
 """
 
-import requests
 import json
-from typing import Dict, Any
+from typing import Any, Dict, List
 
-# API base URL
+import requests
+
 BASE_URL = "http://localhost:8000"
 
 
 class VulNwebClient:
-    """Client for interacting with VulNweb API"""
+    """Client for interacting with VulNweb API."""
 
     def __init__(self, base_url: str = BASE_URL):
         self.base_url = base_url
         self.session = requests.Session()
 
     def health_check(self) -> Dict[str, Any]:
-        """Check API health"""
-        response = self.session.get(f"{self.base_url}/health")
-        return response.json()
+        return self.session.get(f"{self.base_url}/health").json()
 
-    def scan_url(self, url: str) -> Dict[str, Any]:
-        """Scan URL with VirusTotal"""
-        response = self.session.post(
-            f"{self.base_url}/threats/virustotal/scan-url",
+    def status(self) -> Dict[str, Any]:
+        return self.session.get(f"{self.base_url}/api/status").json()
+
+    def get_features(self) -> Dict[str, Any]:
+        return self.session.get(f"{self.base_url}/api/features").json()
+
+    def get_model_info(self) -> Dict[str, Any]:
+        return self.session.get(f"{self.base_url}/api/model-info").json()
+
+    def predict_url(self, url: str) -> Dict[str, Any]:
+        return self.session.post(
+            f"{self.base_url}/api/predict",
             json={"url": url}
-        )
-        return response.json()
+        ).json()
 
-    def scan_file_hash(self, file_hash: str) -> Dict[str, Any]:
-        """Scan file hash with VirusTotal"""
-        response = self.session.post(
-            f"{self.base_url}/threats/virustotal/scan-file",
-            json={"file_hash": file_hash}
-        )
-        return response.json()
+    def predict_raw(self, features: List[float]) -> Dict[str, Any]:
+        return self.session.post(
+            f"{self.base_url}/api/predict-raw",
+            json={"features": features}
+        ).json()
 
-    def analyze_network_flow(
-        self,
-        source_ip: str,
-        destination_ip: str,
-        source_port: int,
-        destination_port: int,
-        protocol: str,
-        flow_duration: float,
-        total_fwd_packets: int,
-        total_bwd_packets: int
-    ) -> Dict[str, Any]:
-        """Analyze network flow for threats"""
-        response = self.session.post(
-            f"{self.base_url}/threats/network/analyze",
+    def predict_batch(self, urls: List[str]) -> Dict[str, Any]:
+        return self.session.post(
+            f"{self.base_url}/api/predict-batch",
+            json={"urls": urls}
+        ).json()
+
+    def submit_feedback(self, request_id: str, is_correct: bool, comments: str = "") -> Dict[str, Any]:
+        return self.session.post(
+            f"{self.base_url}/api/feedback",
             json={
-                "source_ip": source_ip,
-                "destination_ip": destination_ip,
-                "source_port": source_port,
-                "destination_port": destination_port,
-                "protocol": protocol,
-                "flow_duration": flow_duration,
-                "total_fwd_packets": total_fwd_packets,
-                "total_bwd_packets": total_bwd_packets
+                "request_id": request_id,
+                "is_correct": is_correct,
+                "comments": comments
             }
-        )
-        return response.json()
-
-    def batch_analyze(
-        self,
-        urls: list = None,
-        file_hashes: list = None,
-        network_flows: list = None
-    ) -> Dict[str, Any]:
-        """Perform batch analysis"""
-        response = self.session.post(
-            f"{self.base_url}/threats/batch-analyze",
-            json={
-                "urls": urls,
-                "file_hashes": file_hashes,
-                "network_flows": network_flows
-            }
-        )
-        return response.json()
-
-    def get_dataset_info(self) -> Dict[str, Any]:
-        """Get UNSW-NB15 dataset information"""
-        response = self.session.get(f"{self.base_url}/threats/dataset/info")
-        return response.json()
-
-    def download_dataset(self) -> Dict[str, Any]:
-        """Download UNSW-NB15 dataset"""
-        response = self.session.get(f"{self.base_url}/threats/download-dataset")
-        return response.json()
+        ).json()
 
 
-def example_health_check():
-    """Example: Check API health"""
+def print_section(title: str):
+    print("\n" + "=" * 60)
+    print(title)
     print("=" * 60)
-    print("Example 1: Health Check")
-    print("=" * 60)
-
-    client = VulNwebClient()
-    result = client.health_check()
-    print(json.dumps(result, indent=2))
-    print()
-
-
-def example_virustotal_url_scan():
-    """Example: Scan URL with VirusTotal"""
-    print("=" * 60)
-    print("Example 2: VirusTotal URL Scan")
-    print("=" * 60)
-
-    client = VulNwebClient()
-
-    # Scan a safe URL
-    result = client.scan_url("https://www.google.com")
-    print("Scanning: https://www.google.com")
-    print(json.dumps(result, indent=2))
-    print()
-
-    # Scan another URL
-    result = client.scan_url("https://www.github.com")
-    print("Scanning: https://www.github.com")
-    print(json.dumps(result, indent=2))
-    print()
-
-
-def example_virustotal_file_scan():
-    """Example: Scan file hash with VirusTotal"""
-    print("=" * 60)
-    print("Example 3: VirusTotal File Hash Scan")
-    print("=" * 60)
-
-    client = VulNwebClient()
-
-    # Example file hashes (these are famous malware hashes)
-    file_hashes = [
-        "affe6aff8a5de9f59dc4a3e7b02a6ddf",  # Fake hash for demo
-    ]
-
-    for file_hash in file_hashes:
-        result = client.scan_file_hash(file_hash)
-        print(f"Scanning file hash: {file_hash}")
-        print(json.dumps(result, indent=2))
-        print()
-
-
-def example_network_threat_analysis():
-    """Example: Analyze network flows for threats"""
-    print("=" * 60)
-    print("Example 4: Network Threat Analysis (UNSW-NB15)")
-    print("=" * 60)
-
-    client = VulNwebClient()
-
-    # Example network flows
-    flows = [
-        {
-            "label": "Normal HTTPS traffic",
-            "source_ip": "192.168.1.100",
-            "destination_ip": "142.250.185.46",  # google.com
-            "source_port": 54321,
-            "destination_port": 443,
-            "protocol": "TCP",
-            "flow_duration": 120.5,
-            "total_fwd_packets": 150,
-            "total_bwd_packets": 140
-        },
-        {
-            "label": "Suspicious port communication",
-            "source_ip": "192.168.1.50",
-            "destination_ip": "10.0.0.1",
-            "source_port": 12345,
-            "destination_port": 4444,  # Suspicious port
-            "protocol": "TCP",
-            "flow_duration": 300.0,
-            "total_fwd_packets": 50,
-            "total_bwd_packets": 200
-        },
-        {
-            "label": "DoS-like traffic pattern",
-            "source_ip": "203.0.113.50",
-            "destination_ip": "192.168.1.1",  # Local gateway
-            "source_port": 65432,
-            "destination_port": 80,
-            "protocol": "TCP",
-            "flow_duration": 5000.0,
-            "total_fwd_packets": 1000,
-            "total_bwd_packets": 50
-        }
-    ]
-
-    for flow in flows:
-        label = flow.pop("label")
-        print(f"\nAnalyzing: {label}")
-        result = client.analyze_network_flow(**flow)
-        print(json.dumps(result, indent=2))
-
-
-def example_batch_analysis():
-    """Example: Batch analysis of multiple threats"""
-    print("=" * 60)
-    print("Example 5: Batch Analysis")
-    print("=" * 60)
-
-    client = VulNwebClient()
-
-    # Prepare batch data
-    batch_data = {
-        "urls": [
-            "https://www.google.com",
-            "https://www.github.com"
-        ],
-        "file_hashes": [
-            "affe6aff8a5de9f59dc4a3e7b02a6ddf"
-        ],
-        "network_flows": [
-            {
-                "source_ip": "192.168.1.100",
-                "destination_ip": "142.250.185.46",
-                "source_port": 54321,
-                "destination_port": 443,
-                "protocol": "TCP",
-                "flow_duration": 120.5,
-                "total_fwd_packets": 150,
-                "total_bwd_packets": 140
-            }
-        ]
-    }
-
-    result = client.batch_analyze(
-        urls=batch_data["urls"],
-        file_hashes=batch_data["file_hashes"],
-        network_flows=batch_data["network_flows"]
-    )
-
-    print("Batch Analysis Results:")
-    print(f"Total items analyzed: {result['total_items']}")
-    print(f"Threats detected: {result['threats_detected']}")
-    print(f"Critical: {result['critical_count']}")
-    print(f"Suspicious: {result['suspicious_count']}")
-    print("\nDetailed Results:")
-    print(json.dumps(result, indent=2))
-    print()
-
-
-def example_dataset_info():
-    """Example: Get dataset information"""
-    print("=" * 60)
-    print("Example 6: UNSW-NB15 Dataset Information")
-    print("=" * 60)
-
-    client = VulNwebClient()
-
-    result = client.get_dataset_info()
-    print("Dataset Information:")
-    print(json.dumps(result, indent=2))
-    print()
 
 
 def main():
-    """Run all examples"""
-    print("\n" + "=" * 60)
-    print("VulNweb API Usage Examples")
-    print("=" * 60 + "\n")
+    client = VulNwebClient()
 
-    try:
-        # Test health first
-        client = VulNwebClient()
-        health = client.health_check()
-        if health["status"] != "ok":
-            print("ERROR: API is not healthy. Make sure the server is running.")
-            print("Start the server with: uvicorn backend.app.main:app --reload")
-            return
+    print_section("Health")
+    health = client.health_check()
+    print(json.dumps(health, indent=2))
+    if health.get("status") not in {"healthy", "degraded"}:
+        print("API is not reachable or healthy enough to continue.")
+        return
 
-        # Run examples
-        example_health_check()
-        example_dataset_info()
+    print_section("API Status + Metadata")
+    print(json.dumps(client.status(), indent=2))
+    print(json.dumps(client.get_model_info(), indent=2))
+    print(json.dumps(client.get_features(), indent=2))
 
-        # These examples may fail if API keys are not configured
-        try:
-            example_virustotal_url_scan()
-        except Exception as e:
-            print(f"VirusTotal examples skipped: {e}")
-            print("Set VIRUSTOTAL_API_KEY environment variable to enable.\n")
+    print_section("URL Prediction")
+    url_result = client.predict_url("https://example.com/login")
+    print(json.dumps(url_result, indent=2))
 
-        example_network_threat_analysis()
-        example_batch_analysis()
+    print_section("Raw Feature Prediction")
+    raw_features = [5, 443, 64, 0, 2, 1, 10, 20, 1, 5, 0, 0, 0, 0, 1, 10, 0, 1, 0, 100, 0.1, 0.2, 50, 100, 0, 64, 100, 2.5, 0.8, 1024, 0.1, 2048, 1.5, 256]
+    raw_result = client.predict_raw(raw_features)
+    print(json.dumps(raw_result, indent=2))
 
-    except requests.exceptions.ConnectionError:
-        print("ERROR: Could not connect to API at http://localhost:8000")
-        print("Make sure the API server is running:")
-        print("  uvicorn backend.app.main:app --reload")
-    except Exception as e:
-        print(f"ERROR: {e}")
+    print_section("Batch Prediction")
+    batch_result = client.predict_batch([
+        "https://www.google.com",
+        "https://example.com/download?file=test.exe"
+    ])
+    print(json.dumps(batch_result, indent=2))
+
+    print_section("Feedback")
+    request_id = url_result.get("request_id") or raw_result.get("request_id") or "req_example"
+    feedback_result = client.submit_feedback(
+        request_id=request_id,
+        is_correct=True,
+        comments="Example feedback from API usage script"
+    )
+    print(json.dumps(feedback_result, indent=2))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except requests.exceptions.ConnectionError:
+        print("ERROR: Could not connect to API at http://localhost:8000")
+        print("Start with: uvicorn backend.app.main:app --reload")
