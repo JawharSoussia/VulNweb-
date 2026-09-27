@@ -52,6 +52,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan
 )
+app.state.model_package = None
 
 
 # ============================================================================
