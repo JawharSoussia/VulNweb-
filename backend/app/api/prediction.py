@@ -349,7 +349,6 @@ async def get_model_info(request: Request):
 
     return {
         "model_name": model_package.metadata.get('model_name', 'Unknown'),
-        "model_backend": model_package.backend,
         "model_version": model_package.metadata.get('trained_at', 'Unknown'),
         "num_classes": model_package.num_classes,
         "class_names": ["Safe", "Threat Level 1", "Threat Level 2"],

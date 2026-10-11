@@ -54,38 +54,11 @@ Chrome Extension → FastAPI Backend → ML Model → PostgreSQL
 - **ORM:** Alembic for migrations
 
 ### Machine Learning
-- **Primary Model:** XGBoost 2.0.2 (recommended for this tabular feature set)
-- **Optional Model:** PyTorch 2.2+ MLP, selectable for experimentation or future neural models
+- **Primary Model:** XGBoost 2.0.2
 - **Model Selection:** Scikit-learn 1.3.2
 - **Data Processing:** Pandas 2.1.3, NumPy 1.26.2
 - **Explainability:** SHAP 0.43.0, LIME 0.2.0.1
 - **Data Imbalance:** Imbalanced-learn 0.11.0 (if needed)
-
-### Choosing the ML backend
-
-The current URL detector uses 37 engineered numeric features. XGBoost remains
-the default because the existing evaluation reports approximately 95.7%
-accuracy and tree models are fast and effective on this type of tabular data.
-PyTorch is included as an optional neural-network backend when you want to
-experiment with a learned representation or extend the model later.
-
-Train the optional PyTorch model from the project root:
-
-```bash
-python -m ml_model.training.train_pytorch
-```
-
-Select it for the API with an environment variable:
-
-```powershell
-$env:VULNWEB_MODEL_BACKEND="pytorch"
-uvicorn backend.app.main:app --reload
-```
-
-Leave the variable unset (or set it to `xgboost`) to keep the current
-production model. PyTorch predictions use the same three classes and feature
-contract. The current SHAP explanation endpoint returns an empty explanation
-for PyTorch because SHAP support is implemented for the existing tree model.
 
 ### Frontend
 - **Browser:** Chrome/Chromium-based
