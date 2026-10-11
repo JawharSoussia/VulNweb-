@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Tuple
 import numpy as np
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -12,7 +13,8 @@ logger = logging.getLogger(__name__)
 class ModelPackage:
     """Manages model loading and versioning"""
 
-    def __init__(self, model_dir: str = "ml_model/training/models"):
+    def __init__(self, model_dir: str = "ml_model/training/models",
+                 backend: str | None = None):
         """Initialize model package"""
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)
@@ -23,9 +25,32 @@ class ModelPackage:
         self.metadata = None
         self.feature_names = None
         self.num_classes = 3
+        self.backend = (backend or os.getenv("VULNWEB_MODEL_BACKEND", "xgboost")).lower()
+        if self.backend not in {"xgboost", "pytorch"}:
+            raise ValueError("VULNWEB_MODEL_BACKEND must be 'xgboost' or 'pytorch'")
 
     def load_model(self, model_name: str = "XGBoost_model.pkl"):
         """Load trained model"""
+        if self.backend == "pytorch":
+            from .pytorch_model import build_model
+            import torch
+
+            model_path = Path("ml_model/inference/models") / "pytorch_url_threat.pt"
+            if not model_path.exists():
+                raise FileNotFoundError(
+                    f"PyTorch checkpoint not found: {model_path}. "
+                    "Run ml_model/training/train_pytorch.py first."
+                )
+            checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
+            self.model = build_model(
+                checkpoint["input_features"], checkpoint["num_classes"]
+            )
+            self.model.load_state_dict(checkpoint["state_dict"])
+            self.model.eval()
+            self.scaler_mean = np.asarray(checkpoint["scaler_mean"], dtype=np.float32)
+            self.scaler_scale = np.asarray(checkpoint["scaler_scale"], dtype=np.float32)
+            return self.model
+
         model_path = self.model_dir / model_name
 
         if not model_path.exists():
@@ -41,6 +66,8 @@ class ModelPackage:
 
     def load_preprocessor(self, preprocessor_name: str = "preprocessor.pkl"):
         """Load preprocessor (scaler, encoder, etc.)"""
+        if self.backend == "pytorch":
+            return None
         preprocessor_path = Path("ml_model/training") / preprocessor_name
 
         if not preprocessor_path.exists():
@@ -75,7 +102,10 @@ class ModelPackage:
 
     def load_metadata(self, metadata_name: str = "model_metadata.json"):
         """Load model metadata"""
-        metadata_path = Path("ml_model/training/models") / metadata_name
+        if self.backend == "pytorch":
+            metadata_path = Path("ml_model/inference/models/pytorch_url_threat_metadata.json")
+        else:
+            metadata_path = Path("ml_model/training/models") / metadata_name
 
         if not metadata_path.exists():
             logger.warning(f"Metadata not found: {metadata_path}")
@@ -94,9 +124,15 @@ class ModelPackage:
         if self.model is None:
             raise ValueError("Model not loaded. Call load_model() first.")
 
-        # Make prediction
-        pred = self.model.predict(X)  # Class prediction (0, 1, or 2)
-        pred_proba = self.model.predict_proba(X)  # Probabilities for each class
+        if self.backend == "pytorch":
+            from .pytorch_model import predict_proba
+
+            scaled = (X.astype(np.float32) - self.scaler_mean) / self.scaler_scale
+            pred_proba = predict_proba(self.model, scaled)
+            pred = np.argmax(pred_proba, axis=1)
+        else:
+            pred = self.model.predict(X)
+            pred_proba = self.model.predict_proba(X)
 
         # Map class to threat score and level
         class_pred = int(pred[0])
@@ -127,6 +163,9 @@ class ModelPackage:
 
     def explain(self, X: np.ndarray, k: int = 3) -> list:
         """Get explanation"""
+        if self.backend == "pytorch":
+            logger.info("SHAP explanations are not available for the PyTorch backend")
+            return []
         if self.explainer is None:
             logger.warning("Explainer not loaded")
             return []
